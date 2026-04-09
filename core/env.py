@@ -4,10 +4,11 @@ import pygame
 
 from core.config import Action, Colors, Physics, Screen
 from core.drone import Drone2D
+from core.expert import Expert
 
 
 class DroneEnvironment:
-    def __init__(self):
+    def __init__(self, useExpert=False):
         pygame.init()
         self.screen = pygame.display.set_mode((Screen.WIDTH, Screen.HEIGHT))
         pygame.display.set_caption(
@@ -19,6 +20,9 @@ class DroneEnvironment:
         # Start drone in the middle
         self.drone = Drone2D(Screen.WIDTH / 2, Screen.HEIGHT / 2)
 
+        if useExpert:
+            self.expert = Expert()
+
     def _calculateRotorColors(self):
         """Determines rotor color. Lateral movement always takes priority."""
         # Check for Lateral Input
@@ -26,12 +30,6 @@ class DroneEnvironment:
             return Colors.BLUE, Colors.BLUE
         elif self.drone.action.LEFT > 0.1:
             return Colors.YELLOW, Colors.YELLOW
-
-        # Fallback to Vertical Input
-        elif self.drone.action.UP > 0.1:
-            return Colors.GREEN, Colors.GREEN
-        elif self.drone.action.DOWN > 0.1:
-            return Colors.RED, Colors.RED
 
         else:
             return Colors.GRAY, Colors.GRAY
@@ -104,13 +102,22 @@ class DroneEnvironment:
         self._drawDroneBody(cx, cy, theta)
         self._drawLateralVector(cx, cy)
 
+        if self.expert:
+            targetX, targetY = self.expert.waypoints[self.expert.currWaypointIdx]
+            pygame.draw.circle(
+                self.screen, Colors.GREEN, (int(targetX), int(targetY)), 6
+            )
+            pygame.draw.line(
+                self.screen, Colors.GREEN, (cx, cy), (int(targetX), int(targetY)), 1
+            )
+
     def _drawHUD(self):
         x, y, vx, vy, theta, omega = self.drone.state
         texts = [
-            f"Pos: ({x:.1f}, {y:.1f})",
-            f"Vel: ({vx:.1f}, {vy:.1f})",
-            f"Tilt: {math.degrees(theta):.1f} deg",
-            f"Action (V, Lat): ({self.drone.action.UP - self.drone.action.DOWN:.1f}, {self.drone.action.RIGHT - self.drone.action.LEFT:.1f})",
+            f"Position ::: ({x:.1f}, {y:.1f})",
+            f"Velocity ::: ({vx:.1f}, {vy:.1f})",
+            f"Tilt ::: {math.degrees(theta):.1f} deg",
+            f"Action ::: Left: {self.drone.action.LEFT:.2f} | Right: {self.drone.action.RIGHT:.2f}",
             "",
             "Controls: W/S (Up/Down), A/D (Left/Right)",
         ]
@@ -126,35 +133,48 @@ class DroneEnvironment:
         if y > Screen.HEIGHT - margin:
             self.drone.state[1] = Screen.HEIGHT - margin
             self.drone.state[3] = min(0, vy)
+            # Dampen the rotation on hard ground impact
+            self.drone.state[5] *= 0.5
+
         if y < margin:
             self.drone.state[1] = margin
             self.drone.state[3] = max(0, vy)
+
         if x < margin:
             self.drone.state[0] = margin
             self.drone.state[2] = max(0, vx)
+
         if x > Screen.WIDTH - margin:
             self.drone.state[0] = Screen.WIDTH - margin
             self.drone.state[2] = min(0, vx)
 
     def runUserControl(self):
-        running = True
-        while running:
-            action = Action()
+        isRunning: bool = True
+
+        while isRunning:
+            # At start, ~82% power on both (hover)
+            action = Action(0.82, 0.82)
+
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
-                    running = False
+                    isRunning = False
 
-            keys = pygame.key.get_pressed()
+            # For expert control
+            if self.expert:
+                action = self.expert.getAction(self.drone.state, Physics.DT)
 
-            # Map keys directly to named attributes
-            if keys[pygame.K_w]:
-                action.UP = 1.0
-            if keys[pygame.K_s]:
-                action.DOWN = 1.0
-            if keys[pygame.K_a]:
-                action.LEFT = 1.0
-            if keys[pygame.K_d]:
-                action.RIGHT = 1.0
+            else:
+                keys = pygame.key.get_pressed()
+
+                # Map keys directly to named attributes
+                if keys[pygame.K_w]:
+                    action.LEFT = 1.0
+                if keys[pygame.K_s]:
+                    action.LEFT = 0.0
+                if keys[pygame.K_UP]:
+                    action.RIGHT = 1.0
+                if keys[pygame.K_DOWN]:
+                    action.RIGHT = 0.0
 
             # Physics Step
             self.drone.step(action)

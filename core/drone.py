@@ -2,7 +2,7 @@ import math
 
 import numpy as np
 
-from core.config import Action, Drag, Physics, Thrust
+from core.config import Action, Drag, Physics
 
 
 class Drone2D:
@@ -12,46 +12,50 @@ class Drone2D:
 
     def step(self, action):
         self.action = self._handleAction(action)
-        # User Actions
-        uVertical = self.action.UP - self.action.DOWN  # Up/Down
-        uLateral = self.action.RIGHT - self.action.LEFT  # Left/Right
+        # 1. Convert 0-1 actions to actual force values
+        thrustLeft = self.action.LEFT * Physics.MAX_THRUST
+        thrustRight = self.action.RIGHT * Physics.MAX_THRUST
 
         x, y, vx, vy, theta, omega = self.state
 
-        # ---------------------------------------- Auto-Stabilization ----------------------------------------
-        #  Automatic tilting in the direction (Inner-Loop P).
-        targetTheta = uLateral * Physics.MAXTILT
-        errorTheta = targetTheta - theta
+        # ------------------------ ROTATIONAL DYNAMICS ------------------------
+        # ! The hard part for GAIL to learn.
+        # Calculate the effective torque (Force * Arm Length)
+        # * Positive = Clockwise
+        torque = Physics.ARM_LENGTH * (thrustRight - thrustLeft)
 
-        # Apply angular acceleration and air drag
-        omega += errorTheta * Physics.ACCELERATION * Physics.DT
+        # Angular Acceleration (Torque / Inertia)
+        alpha = torque / Physics.INERTIA
+        omega += alpha * Physics.DT
+        # Add the effective angular drag
         omega *= Drag.ANGULAR
 
-        # Update angle
         theta += omega * Physics.DT
         theta = (theta + math.pi) % (2 * math.pi) - math.pi
 
-        # Calculate Forces based on tilt
-        # Total thrust is hover base + player vertical input
-        totalThrust = Thrust.HOVER + (uVertical * Thrust.MOVE)
+        # ------------------------ LINEAR DYNAMICS ------------------------
+        thrustTotal = thrustLeft + thrustRight
 
-        # Decompose thrust into X and Y world coordinates based on current tilt
-        fThrustX = totalThrust * math.sin(theta)
-        fThrustY = -totalThrust * math.cos(theta)
+        # Decompose thrust into world X and Y coordinates
+        fThrustX = thrustTotal * math.sin(theta)
+        fThrustY = -thrustTotal * math.cos(theta)  # Negative because PyGame Y is down
 
-        # Add the force of gravity
+        # Add the influence of gravity
         fGravityY = Physics.GRAVITY
 
-        # Update velocities
-        vx += (fThrustX / Physics.MASS) * Physics.DT
-        vy += ((fThrustY + fGravityY) / Physics.MASS) * Physics.DT
+        # Calculate linear acceleration (Force / Mass)
+        ax = fThrustX / Physics.MASS
+        ay = (fThrustY + fGravityY) / Physics.MASS
 
-        # Apply air drag
-        #  Helps stabilize the drone and prevents perpetual motion.
+        # Update linear velocity
+        vx += ax * Physics.DT
+        vy += ay * Physics.DT
+
+        # Apply linear drag
         vx *= Drag.LINEAR
         vy *= Drag.LINEAR
 
-        # Update Position
+        # Update position
         x += vx * Physics.DT
         y += vy * Physics.DT
 
