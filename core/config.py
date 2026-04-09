@@ -5,8 +5,8 @@ import numpy as np
 
 @dataclass
 class Screen:
-    WIDTH: int = 800
-    HEIGHT: int = 600
+    WIDTH: int = 1200
+    HEIGHT: int = 800
     MARGIN: int = 20
 
 
@@ -79,4 +79,5 @@ class Colors:
     RED: tuple = (255, 50, 50)
     BLUE: tuple = (50, 50, 255)
     GRAY: tuple = (100, 100, 100)
-    GREEN: tuple = (50, 255, 50)  # Added for thrust indication
+    GREEN: tuple = (50, 255, 50)
+    YELLOW: tuple = (255, 255, 50)

@@ -7,25 +7,23 @@ from core.config import Action, Drag, Physics, Thrust
 
 class Drone2D:
     def __init__(self, x, y):
-        # State vector: [x, y, vx, vy, theta, omega]
         self.state = np.array([x, y, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
-
-        # Abstracted actions (UP, DOWN, LEFT, RIGHT)
         self.action = Action()
 
     def step(self, action):
         self.action = self._handleAction(action)
+        # User Actions
         uVertical = self.action.UP - self.action.DOWN  # Up/Down
         uLateral = self.action.RIGHT - self.action.LEFT  # Left/Right
 
         x, y, vx, vy, theta, omega = self.state
 
-        # Auto-Stabilization (Inner-loop controller)
-        #   The drone automatically tilts in the direction of lateral input.
+        # ---------------------------------------- Auto-Stabilization ----------------------------------------
+        #  Automatic tilting in the direction (Inner-Loop P).
         targetTheta = uLateral * Physics.MAXTILT
         errorTheta = targetTheta - theta
 
-        # Apply angular acceleration and drag
+        # Apply angular acceleration and air drag
         omega += errorTheta * Physics.ACCELERATION * Physics.DT
         omega *= Drag.ANGULAR
 
@@ -39,16 +37,17 @@ class Drone2D:
 
         # Decompose thrust into X and Y world coordinates based on current tilt
         fThrustX = totalThrust * math.sin(theta)
-        fThrustY = -totalThrust * math.cos(theta)  # Negative because PyGame Y is down
+        fThrustY = -totalThrust * math.cos(theta)
 
-        # Add Gravity
+        # Add the force of gravity
         fGravityY = Physics.GRAVITY
 
-        # Update Velocity
-        vx += (fThrustX * Physics.MASS) * Physics.DT
-        vy += (fThrustY + fGravityY) * Physics.MASS * Physics.DT
+        # Update velocities
+        vx += (fThrustX / Physics.MASS) * Physics.DT
+        vy += ((fThrustY + fGravityY) / Physics.MASS) * Physics.DT
 
         # Apply air drag
+        #  Helps stabilize the drone and prevents perpetual motion.
         vx *= Drag.LINEAR
         vy *= Drag.LINEAR
 

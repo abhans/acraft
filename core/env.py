@@ -14,42 +14,95 @@ class DroneEnvironment:
             "2D Drone Positioning Simulator - High Level Control"
         )
         self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("JetBrains Mono", 16)
+        self.font = pygame.font.SysFont("JetBrains Mono", 12)
 
         # Start drone in the middle
         self.drone = Drone2D(Screen.WIDTH / 2, Screen.HEIGHT / 2)
 
-    def _drawDrone(self):
-        x, y, vx, vy, theta, omega = self.drone.state
-        cx, cy = int(x), int(y)
+    def _calculateRotorColors(self):
+        """Determines rotor color. Lateral movement always takes priority."""
+        # Check for Lateral Input
+        if self.drone.action.RIGHT > 0.1:
+            return Colors.BLUE, Colors.BLUE
+        elif self.drone.action.LEFT > 0.1:
+            return Colors.YELLOW, Colors.YELLOW
 
+        # Fallback to Vertical Input
+        elif self.drone.action.UP > 0.1:
+            return Colors.GREEN, Colors.GREEN
+        elif self.drone.action.DOWN > 0.1:
+            return Colors.RED, Colors.RED
+
+        else:
+            return Colors.GRAY, Colors.GRAY
+
+    def _drawLateralVector(self, cx, cy):
+        """Draws a horizontal arrow indicating net lateral intent."""
+        lateralIntent = self.drone.action.RIGHT - self.drone.action.LEFT
+
+        # Only draw if there is actual lateral intent
+        if abs(lateralIntent) < 0.1:
+            return
+
+        vectorLength = int(lateralIntent * 60)
+        vecColor = Colors.BLUE if lateralIntent > 0 else Colors.YELLOW
+        endX = cx + vectorLength
+
+        # Draw main thrust line
+        pygame.draw.line(self.screen, vecColor, (cx, cy), (endX, cy), 3)
+
+        # Draw directoin vector
+        arrowSize = 6
+        if vectorLength > 0:
+            pygame.draw.polygon(
+                self.screen,
+                vecColor,
+                [
+                    (endX, cy),
+                    (endX - arrowSize, cy - arrowSize),
+                    (endX - arrowSize, cy + arrowSize),
+                ],
+            )
+        else:
+            pygame.draw.polygon(
+                self.screen,
+                vecColor,
+                [
+                    (endX, cy),
+                    (endX + arrowSize, cy - arrowSize),
+                    (endX + arrowSize, cy + arrowSize),
+                ],
+            )
+
+    def _drawDroneBody(self, cx, cy, theta):
+        """Draws the physical frame, rotors, and center of mass."""
         # Calculate rotor endpoints
         leftX = cx - int(Physics.ARM_LENGTH * math.cos(theta))
         leftY = cy - int(Physics.ARM_LENGTH * math.sin(theta))
         rightX = cx + int(Physics.ARM_LENGTH * math.cos(theta))
         rightY = cy + int(Physics.ARM_LENGTH * math.sin(theta))
 
-        # Draw Body
+        # Draw Frame
         pygame.draw.line(self.screen, Colors.WHITE, (leftX, leftY), (rightX, rightY), 4)
 
-        # Determine rotor color based on thrust (Green for UP, Red for DOWN)
-        lThrust = self.drone.action.UP - self.drone.action.DOWN
-        rThrust = self.drone.action.UP - self.drone.action.DOWN
-        colorLeft = (
-            (0, int(255 * lThrust), 0) if lThrust > 0 else (int(-255 * lThrust), 0, 0)
-        )
-        colorRight = (
-            (0, int(255 * rThrust), 0) if rThrust > 0 else (int(-255 * rThrust), 0, 0)
-        )
-
-        # Draw Rotors
+        # Fetch calculated colors and draw rotors
+        colorLeft, colorRight = self._calculateRotorColors()
         pygame.draw.circle(self.screen, colorLeft, (leftX, leftY), Physics.ROTOR_RADIUS)
         pygame.draw.circle(
             self.screen, colorRight, (rightX, rightY), Physics.ROTOR_RADIUS
         )
 
         # Draw Center of Mass
-        pygame.draw.circle(self.screen, Colors.GRAY, (cx, cy), 4)
+        pygame.draw.circle(self.screen, Colors.WHITE, (cx, cy), 4)
+
+    def _drawDrone(self):
+        """Main orchestrator for drone rendering."""
+        x, y, vx, vy, theta, omega = self.drone.state
+        cx, cy = int(x), int(y)
+
+        # Draw layers in correct order (Body first, Vector on top)
+        self._drawDroneBody(cx, cy, theta)
+        self._drawLateralVector(cx, cy)
 
     def _drawHUD(self):
         x, y, vx, vy, theta, omega = self.drone.state
@@ -57,7 +110,7 @@ class DroneEnvironment:
             f"Pos: ({x:.1f}, {y:.1f})",
             f"Vel: ({vx:.1f}, {vy:.1f})",
             f"Tilt: {math.degrees(theta):.1f} deg",
-            f"Action (V, Lat): ({self.drone.action.UP - self.drone.action.DOWN:.1f}, {self.drone.action.RIGHT - self.drone.action.LEFT:.1f})",  # Updated
+            f"Action (V, Lat): ({self.drone.action.UP - self.drone.action.DOWN:.1f}, {self.drone.action.RIGHT - self.drone.action.LEFT:.1f})",
             "",
             "Controls: W/S (Up/Down), A/D (Left/Right)",
         ]
@@ -68,25 +121,24 @@ class DroneEnvironment:
     def _enforceBoundaries(self):
         """Keeps drone on screen and stops velocity on impact"""
         x, y, vx, vy, theta, omega = self.drone.state
-        Screen.MARGIN = 20
+        margin = Screen.MARGIN
 
-        if y > Screen.HEIGHT - Screen.MARGIN:
-            self.drone.state[1] = Screen.HEIGHT - Screen.MARGIN
-            self.drone.state[3] = min(0, vy)  # Stop downward momentum
-        if y < Screen.MARGIN:
-            self.drone.state[1] = Screen.MARGIN
-            self.drone.state[3] = max(0, vy)  # Stop upward momentum
-        if x < Screen.MARGIN:
-            self.drone.state[0] = Screen.MARGIN
+        if y > Screen.HEIGHT - margin:
+            self.drone.state[1] = Screen.HEIGHT - margin
+            self.drone.state[3] = min(0, vy)
+        if y < margin:
+            self.drone.state[1] = margin
+            self.drone.state[3] = max(0, vy)
+        if x < margin:
+            self.drone.state[0] = margin
             self.drone.state[2] = max(0, vx)
-        if x > Screen.WIDTH - Screen.MARGIN:
-            self.drone.state[0] = Screen.WIDTH - Screen.MARGIN
+        if x > Screen.WIDTH - margin:
+            self.drone.state[0] = Screen.WIDTH - margin
             self.drone.state[2] = min(0, vx)
 
     def runUserControl(self):
         running = True
         while running:
-            # Action format: [vertical, lateral] -> defaults to [0,0] which is a stable hover
             action = Action()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
