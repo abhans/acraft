@@ -18,10 +18,10 @@ class Physics:
     making the simulation stable and intuitive for RL.
     """
 
-    GRAVITY: float = 500.0  # px/s^2
-    MASS: float = 1.0  # Kept for formula structure (F=ma)
-    MAXTILT: float = 0.6  # Max radians the drone will tilt (~34 degrees)
-    ACCELERATION: float = 7.0  # How fast it reaches target tilt
+    GRAVITY: float = 980.0  # Effective Gravity  (pixels/s^2)
+    MASS: float = 5.0  # Mass of the drone (kg)
+    INERTIA: float = 20.0  # Moment of inertia for rotation (kg*pixels^2)
+    MAX_THRUST: float = 600.0  # Max force per rotor (pixels/s^2)
     ARM_LENGTH: int = 30  # Visual length of drone arm in pixels
     ROTOR_RADIUS: int = 8  # Visual size of rotors
     FPS: float = 60.0
@@ -48,28 +48,26 @@ class Drag:
     """
 
     LINEAR: float = 0.99
-    ANGULAR: float = 0.92
+    ANGULAR: float = 0.98
 
 
 @dataclass
 class Action:
     """
-    4D Abstracted Action Space for the Drone.
+    'D Abstracted Action Space for the Drone.
     Values are expected to be between 0.0 (off) and 1.0 (full thrust).
     """
 
-    UP: float = 0.0
-    DOWN: float = 0.0
     LEFT: float = 0.0
     RIGHT: float = 0.0
 
     def to_numpy(self) -> np.ndarray:
         """Converts the named actions into a 1D NumPy array for Physics/PyTorch."""
-        return np.array([self.UP, self.DOWN, self.LEFT, self.RIGHT], dtype=np.float64)
+        return np.array([self.LEFT, self.RIGHT], dtype=np.float64)
 
     def __iter__(self):
         """Allows unpacking like: up, down, left, right = action"""
-        return iter((self.UP, self.DOWN, self.LEFT, self.RIGHT))
+        return iter((self.LEFT, self.RIGHT))
 
 
 @dataclass
