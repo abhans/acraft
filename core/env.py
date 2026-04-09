@@ -8,14 +8,16 @@ from core.expert import Expert
 
 
 class DroneEnvironment:
-    def __init__(self, useExpert=False):
-        pygame.init()
-        self.screen = pygame.display.set_mode((Screen.WIDTH, Screen.HEIGHT))
-        pygame.display.set_caption(
-            "2D Drone Positioning Simulator - High Level Control"
-        )
-        self.clock = pygame.time.Clock()
-        self.font = pygame.font.SysFont("JetBrains Mono", 12)
+    def __init__(self, useExpert=False, render=True):
+        # Render flag to open/close PyGame rendering
+        self.render = render
+
+        if self.render:
+            pygame.init()
+            self.screen = pygame.display.set_mode((Screen.WIDTH, Screen.HEIGHT))
+            pygame.display.set_caption("2D Drone Positioning Simulator")
+            self.clock = pygame.time.Clock()
+            self.font = pygame.font.SysFont("JetBrains Mono", 12)
 
         # Start drone in the middle
         self.drone = Drone2D(Screen.WIDTH / 2, Screen.HEIGHT / 2)
@@ -155,9 +157,10 @@ class DroneEnvironment:
             # At start, ~82% power on both (hover)
             action = Action(0.82, 0.82)
 
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    isRunning = False
+            if self.render:
+                for event in pygame.event.get():
+                    if event.type == pygame.QUIT:
+                        isRunning = False
 
             # For expert control
             if self.expert:
@@ -181,17 +184,19 @@ class DroneEnvironment:
             self._enforceBoundaries()
 
             # Render
-            self.screen.fill(Colors.BLACK)
-            pygame.draw.rect(
-                self.screen, Colors.GRAY, (0, 0, Screen.WIDTH, Screen.HEIGHT), 2
-            )
-            self._drawDrone()
-            self._drawHUD()
+            if self.render:
+                self.screen.fill(Colors.BLACK)
+                pygame.draw.rect(
+                    self.screen, Colors.GRAY, (0, 0, Screen.WIDTH, Screen.HEIGHT), 2
+                )
+                self._drawDrone()
+                self._drawHUD()
 
-            pygame.display.flip()
-            self.clock.tick(Physics.FPS)
+                pygame.display.flip()
+                self.clock.tick(Physics.FPS)
 
-        pygame.quit()
+        if self.render:
+            pygame.quit()
 
 
 if __name__ == "__main__":
