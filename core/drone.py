@@ -4,15 +4,30 @@ import numpy as np
 
 from core.config import Action, Drag, Physics
 
+"""
+2D Drone Model with Pixel-Based Physics
+This class simulates a 2D drone with realistic physics using pixel units.
 
-class Drone2D:
+------------ STATES ------------
+- x, y: Position of the drone's center of mass (pixels)
+- vx, vy: Linear velocity (pixels/s)
+- theta: Orientation angle (radians)
+- omega: Angular velocity (radians/s)
+
+------------ ACTIONS ------------
+- LEFT: Thrust level for the left rotor (0.0 to 1.0)
+- RIGHT: Thrust level for the right rotor (0.0 to 1.0)
+"""
+
+
+class Drone:
     def __init__(self, x, y):
         self.state = np.array([x, y, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
         self.action = Action()
 
     def step(self, action):
         self.action = self._handleAction(action)
-        # 1. Convert 0-1 actions to actual force values
+        # Convert 0-1 actions to actual force values
         thrustLeft = self.action.LEFT * Physics.MAX_THRUST
         thrustRight = self.action.RIGHT * Physics.MAX_THRUST
 
@@ -26,9 +41,7 @@ class Drone2D:
 
         # Angular Acceleration (Torque / Inertia)
         alpha = torque / Physics.INERTIA
-        omega += alpha * Physics.DT
-        # Add the effective angular drag
-        omega *= Drag.ANGULAR
+        omega += (alpha * Physics.DT) * Drag.ANGULAR
 
         theta += omega * Physics.DT
         theta = (theta + math.pi) % (2 * math.pi) - math.pi
@@ -38,28 +51,21 @@ class Drone2D:
 
         # Decompose thrust into world X and Y coordinates
         fThrustX = thrustTotal * math.sin(theta)
-        fThrustY = -thrustTotal * math.cos(theta)  # Negative because PyGame Y is down
+        fThrustY = -thrustTotal * math.cos(theta)
 
-        # Add the influence of gravity
-        fGravityY = Physics.GRAVITY
-
-        # Calculate linear acceleration (Force / Mass)
+        # Linear acceleration (Force / Mass)
         ax = fThrustX / Physics.MASS
-        ay = (fThrustY + fGravityY) / Physics.MASS
+        ay = (fThrustY + Physics.GRAVITY) / Physics.MASS
 
         # Update linear velocity
-        vx += ax * Physics.DT
-        vy += ay * Physics.DT
-
-        # Apply linear drag
-        vx *= Drag.LINEAR
-        vy *= Drag.LINEAR
+        vx += (ax * Physics.DT) * Drag.LINEAR
+        vy += (ay * Physics.DT) * Drag.LINEAR
 
         # Update position
         x += vx * Physics.DT
         y += vy * Physics.DT
 
-        self.state = np.array([x, y, vx, vy, theta, omega], dtype=np.float64)
+        self.state = np.array([x, y, vx, vy, theta, omega], dtype=np.float32)
         return self.state
 
     def _handleAction(self, action):

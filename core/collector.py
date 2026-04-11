@@ -5,7 +5,7 @@ import time
 import numpy as np
 
 from core.config import Physics, Screen
-from core.env import DroneEnvironment
+from core.env import Environment
 
 
 class DataCollector:
@@ -21,8 +21,10 @@ class DataCollector:
         # Normalize the state variables
         normX = (x - (Screen.WIDTH / 2)) / (Screen.WIDTH / 2)
         normY = (y - (Screen.HEIGHT / 2)) / (Screen.HEIGHT / 2)
+
         normVX = np.clip(vx / 1000.0, range[0], range[1])
         normVY = np.clip(vy / 1000.0, range[0], range[1])
+
         normTheta = theta / math.pi
         normOmega = np.clip(omega / 5.0, range[0], range[1])
 
@@ -40,7 +42,7 @@ class DataCollector:
         return list()
 
     def collect(self):
-        env = DroneEnvironment(useExpert=True, render=False)
+        env = Environment(useExpert=True, render=False)
 
         print(f"[DATA] Collecting {self.numTrajec} trajectories...")
 

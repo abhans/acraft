@@ -1,5 +1,5 @@
-from core.env import DroneEnvironment
+from core.env import Environment
 
 if __name__ == "__main__":
-    env = DroneEnvironment(useExpert=True)
+    env = Environment(useExpert=True)
     env.runUserControl()
