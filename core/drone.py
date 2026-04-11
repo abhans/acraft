@@ -2,60 +2,70 @@ import math
 
 import numpy as np
 
-from core.config import Action, Drag, Physics, Thrust
+from core.config import Action, Drag, Physics
+
+"""
+2D Drone Model with Pixel-Based Physics
+This class simulates a 2D drone with realistic physics using pixel units.
+
+------------ STATES ------------
+- x, y: Position of the drone's center of mass (pixels)
+- vx, vy: Linear velocity (pixels/s)
+- theta: Orientation angle (radians)
+- omega: Angular velocity (radians/s)
+
+------------ ACTIONS ------------
+- LEFT: Thrust level for the left rotor (0.0 to 1.0)
+- RIGHT: Thrust level for the right rotor (0.0 to 1.0)
+"""
 
 
-class Drone2D:
+class Drone:
     def __init__(self, x, y):
         self.state = np.array([x, y, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
         self.action = Action()
 
     def step(self, action):
         self.action = self._handleAction(action)
-        # User Actions
-        uVertical = self.action.UP - self.action.DOWN  # Up/Down
-        uLateral = self.action.RIGHT - self.action.LEFT  # Left/Right
+        # Convert 0-1 actions to actual force values
+        thrustLeft = self.action.LEFT * Physics.MAX_THRUST
+        thrustRight = self.action.RIGHT * Physics.MAX_THRUST
 
         x, y, vx, vy, theta, omega = self.state
 
-        # ---------------------------------------- Auto-Stabilization ----------------------------------------
-        #  Automatic tilting in the direction (Inner-Loop P).
-        targetTheta = uLateral * Physics.MAXTILT
-        errorTheta = targetTheta - theta
+        # ------------------------ ROTATIONAL DYNAMICS ------------------------
+        # ! The hard part for GAIL to learn.
+        # Calculate the effective torque (Force * Arm Length)
+        # * Positive = Clockwise
+        torque = Physics.ARM_LENGTH * (thrustRight - thrustLeft)
 
-        # Apply angular acceleration and air drag
-        omega += errorTheta * Physics.ACCELERATION * Physics.DT
-        omega *= Drag.ANGULAR
+        # Angular Acceleration (Torque / Inertia)
+        alpha = torque / Physics.INERTIA
+        omega += (alpha * Physics.DT) * Drag.ANGULAR
 
-        # Update angle
         theta += omega * Physics.DT
         theta = (theta + math.pi) % (2 * math.pi) - math.pi
 
-        # Calculate Forces based on tilt
-        # Total thrust is hover base + player vertical input
-        totalThrust = Thrust.HOVER + (uVertical * Thrust.MOVE)
+        # ------------------------ LINEAR DYNAMICS ------------------------
+        thrustTotal = thrustLeft + thrustRight
 
-        # Decompose thrust into X and Y world coordinates based on current tilt
-        fThrustX = totalThrust * math.sin(theta)
-        fThrustY = -totalThrust * math.cos(theta)
+        # Decompose thrust into world X and Y coordinates
+        fThrustX = thrustTotal * math.sin(theta)
+        fThrustY = -thrustTotal * math.cos(theta)
 
-        # Add the force of gravity
-        fGravityY = Physics.GRAVITY
+        # Linear acceleration (Force / Mass)
+        ax = fThrustX / Physics.MASS
+        ay = (fThrustY + Physics.GRAVITY) / Physics.MASS
 
-        # Update velocities
-        vx += (fThrustX / Physics.MASS) * Physics.DT
-        vy += ((fThrustY + fGravityY) / Physics.MASS) * Physics.DT
+        # Update linear velocity
+        vx += (ax * Physics.DT) * Drag.LINEAR
+        vy += (ay * Physics.DT) * Drag.LINEAR
 
-        # Apply air drag
-        #  Helps stabilize the drone and prevents perpetual motion.
-        vx *= Drag.LINEAR
-        vy *= Drag.LINEAR
-
-        # Update Position
+        # Update position
         x += vx * Physics.DT
         y += vy * Physics.DT
 
-        self.state = np.array([x, y, vx, vy, theta, omega], dtype=np.float64)
+        self.state = np.array([x, y, vx, vy, theta, omega], dtype=np.float32)
         return self.state
 
     def _handleAction(self, action):

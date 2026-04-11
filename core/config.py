@@ -2,6 +2,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
+WAYPOINTS: list[tuple[int, ...]] = [
+    (600, 400),
+    (800, 300),
+    (900, 500),
+    (600, 600),
+    (300, 400),
+    (400, 200),
+]
+
 
 @dataclass
 class Screen:
@@ -18,11 +27,12 @@ class Physics:
     making the simulation stable and intuitive for RL.
     """
 
-    GRAVITY: float = 500.0  # px/s^2
-    MASS: float = 1.0  # Kept for formula structure (F=ma)
-    MAXTILT: float = 0.6  # Max radians the drone will tilt (~34 degrees)
-    ACCELERATION: float = 7.0  # How fast it reaches target tilt
-    ARM_LENGTH: int = 30  # Visual length of drone arm in pixels
+    GRAVITY: float = 880.0  # Effective Gravity  (pixels/s^2)
+    MASS: float = 1.0  # Mass of the drone (kg)
+    INERTIA: float = 20.0  # Moment of inertia for rotation (kg*pixels^2)
+    MAX_THRUST: float = 600.0  # Max force per rotor (pixels/s^2)
+    MAX_TILT: float = np.radians(40)  # Max tilt angle (radians)
+    ARM_LENGTH: int = 30  # Visual length of drone arm (pixels)
     ROTOR_RADIUS: int = 8  # Visual size of rotors
     FPS: float = 60.0
     DT: float = 1.0 / FPS
@@ -47,29 +57,27 @@ class Drag:
     These values help stabilize the drone and prevent perpetual motion.
     """
 
-    LINEAR: float = 0.99
-    ANGULAR: float = 0.92
+    LINEAR: float = 0.75
+    ANGULAR: float = 0.77
 
 
 @dataclass
 class Action:
     """
-    4D Abstracted Action Space for the Drone.
+    'D Abstracted Action Space for the Drone.
     Values are expected to be between 0.0 (off) and 1.0 (full thrust).
     """
 
-    UP: float = 0.0
-    DOWN: float = 0.0
     LEFT: float = 0.0
     RIGHT: float = 0.0
 
     def to_numpy(self) -> np.ndarray:
         """Converts the named actions into a 1D NumPy array for Physics/PyTorch."""
-        return np.array([self.UP, self.DOWN, self.LEFT, self.RIGHT], dtype=np.float64)
+        return np.array([self.LEFT, self.RIGHT], dtype=np.float64)
 
     def __iter__(self):
         """Allows unpacking like: up, down, left, right = action"""
-        return iter((self.UP, self.DOWN, self.LEFT, self.RIGHT))
+        return iter((self.LEFT, self.RIGHT))
 
 
 @dataclass
