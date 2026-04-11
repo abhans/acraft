@@ -13,12 +13,12 @@ class PIDController:
     def compute(self, error, dt):
         # Accumulated integral for kI
         self.integral += error * dt
-        # Derivative in error for kD
+        # Derivative (change) in error for kD
         derivative = (error - self.errPrev) / dt if dt > 0 else 0.0
 
         self.errPrev = error
 
-        # PID: kP* error + kI * integral + kD * derivative
+        # PID: kP * error + kI * integral + kD * derivative
         output = (self.kP * error) + (self.kI * self.integral) + (self.kD * derivative)
 
         if self.limit:

@@ -2,6 +2,15 @@ from dataclasses import dataclass
 
 import numpy as np
 
+WAYPOINTS: list[tuple[int, ...]] = [
+    (600, 400),
+    (800, 300),
+    (900, 500),
+    (600, 600),
+    (300, 400),
+    (400, 200),
+]
+
 
 @dataclass
 class Screen:
@@ -18,11 +27,12 @@ class Physics:
     making the simulation stable and intuitive for RL.
     """
 
-    GRAVITY: float = 980.0  # Effective Gravity  (pixels/s^2)
-    MASS: float = 5.0  # Mass of the drone (kg)
+    GRAVITY: float = 880.0  # Effective Gravity  (pixels/s^2)
+    MASS: float = 1.0  # Mass of the drone (kg)
     INERTIA: float = 20.0  # Moment of inertia for rotation (kg*pixels^2)
     MAX_THRUST: float = 600.0  # Max force per rotor (pixels/s^2)
-    ARM_LENGTH: int = 30  # Visual length of drone arm in pixels
+    MAX_TILT: float = np.radians(40)  # Max tilt angle (radians)
+    ARM_LENGTH: int = 30  # Visual length of drone arm (pixels)
     ROTOR_RADIUS: int = 8  # Visual size of rotors
     FPS: float = 60.0
     DT: float = 1.0 / FPS
@@ -47,8 +57,8 @@ class Drag:
     These values help stabilize the drone and prevent perpetual motion.
     """
 
-    LINEAR: float = 0.99
-    ANGULAR: float = 0.98
+    LINEAR: float = 0.75
+    ANGULAR: float = 0.77
 
 
 @dataclass
