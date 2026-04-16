@@ -1,4 +1,5 @@
 import math
+import os
 
 import pygame
 
@@ -82,9 +83,12 @@ class Environment:
 
             # Render
             if self.render:
-                self.screen.fill(Colors.BLACK)
+                self.screen.fill((Colors.BLACK.R, Colors.BLACK.G, Colors.BLACK.B))
                 pygame.draw.rect(
-                    self.screen, Colors.GRAY, (0, 0, Screen.WIDTH, Screen.HEIGHT), 2
+                    self.screen,
+                    (Colors.GRAY.R, Colors.GRAY.G, Colors.GRAY.B),
+                    (0, 0, Screen.WIDTH, Screen.HEIGHT),
+                    2,
                 )
                 self._drawDrone()
                 self._drawHUD()
@@ -95,19 +99,51 @@ class Environment:
         if self.render:
             pygame.quit()
 
-    def _calculateRotorColors(self):
-        # Check for lateral input type
-        if self.drone.action.RIGHT > 0.1:
-            return Colors.BLUE, Colors.BLUE
-        elif self.drone.action.LEFT > 0.1:
-            return Colors.YELLOW, Colors.YELLOW
+            os.system("clear")
 
+    def _thrustToColor(self, thrust):
+        """
+        Calculate color based on thrust gradient.
+        """
+
+        def lerp(a, b, t):
+            return a + (b - a) * t
+
+        if thrust <= 0.4:
+            factor = thrust / 0.4
+            return (
+                int(lerp(Colors.BLUE.R, Colors.YELLOW.R, factor)),
+                int(lerp(Colors.BLUE.G, Colors.YELLOW.G, factor)),
+                int(lerp(Colors.BLUE.B, Colors.YELLOW.B, factor)),
+            )
+        elif thrust <= 0.8:
+            factor = (thrust - 0.4) / 0.4
+            return (
+                int(lerp(Colors.YELLOW.R, Colors.ORANGE.R, factor)),
+                int(lerp(Colors.YELLOW.G, Colors.ORANGE.G, factor)),
+                int(lerp(Colors.YELLOW.B, Colors.ORANGE.B, factor)),
+            )
         else:
-            return Colors.GRAY, Colors.GRAY
+            factor = (thrust - 0.8) / 0.2
+            return (
+                int(lerp(Colors.ORANGE.R, Colors.RED.R, factor)),
+                int(lerp(Colors.ORANGE.G, Colors.RED.G, factor)),
+                int(lerp(Colors.ORANGE.B, Colors.RED.B, factor)),
+            )
+
+    def _calculateRotorColors(self):
+        """
+        Calculate rotor colors based on thrust gradient.
+        """
+        lThrust = self.drone.action.LEFT
+        rThrust = self.drone.action.RIGHT
+        return self._thrustToColor(lThrust), self._thrustToColor(rThrust)
 
     # -------------------------------- RENDERING --------------------------------
     def _drawDroneBody(self, cx, cy, theta):
-        """Draws the physical frame, rotors, and center of mass."""
+        """
+        Draws the physical frame, rotors, and center of mass.
+        """
         # Calculate rotor endpoints
         leftX = cx - int(Physics.ARM_LENGTH * math.cos(theta))
         leftY = cy - int(Physics.ARM_LENGTH * math.sin(theta))
@@ -115,7 +151,13 @@ class Environment:
         rightY = cy + int(Physics.ARM_LENGTH * math.sin(theta))
 
         # Draw Frame
-        pygame.draw.line(self.screen, Colors.WHITE, (leftX, leftY), (rightX, rightY), 4)
+        pygame.draw.line(
+            self.screen,
+            (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B),
+            (leftX, leftY),
+            (rightX, rightY),
+            4,
+        )
 
         # Fetch calculated colors and draw rotors
         colorLeft, colorRight = self._calculateRotorColors()
@@ -125,10 +167,14 @@ class Environment:
         )
 
         # Draw Center of Mass
-        pygame.draw.circle(self.screen, Colors.WHITE, (cx, cy), 4)
+        pygame.draw.circle(
+            self.screen, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B), (cx, cy), 4
+        )
 
     def _drawDrone(self):
-        """Main orchestrator for drone rendering."""
+        """
+        Main orchestrator for drone rendering.
+        """
         x, y, vx, vy, theta, omega = self.drone.state
         cx, cy = int(x), int(y)
 
@@ -138,10 +184,17 @@ class Environment:
         if self.expert:
             targetX, targetY = self.expert.waypoints[self.expert.currWaypointIdx]
             pygame.draw.circle(
-                self.screen, Colors.GREEN, (int(targetX), int(targetY)), 6
+                self.screen,
+                (Colors.GREEN.R, Colors.GREEN.G, Colors.GREEN.B),
+                (int(targetX), int(targetY)),
+                6,
             )
             pygame.draw.line(
-                self.screen, Colors.GREEN, (cx, cy), (int(targetX), int(targetY)), 1
+                self.screen,
+                (Colors.GREEN.R, Colors.GREEN.G, Colors.GREEN.B),
+                (cx, cy),
+                (int(targetX), int(targetY)),
+                1,
             )
 
     def _drawHUD(self):
@@ -152,11 +205,117 @@ class Environment:
             f"Tilt ::: {math.degrees(theta):.1f} deg",
             f"Action ::: Left: {self.drone.action.LEFT:.2f} | Right: {self.drone.action.RIGHT:.2f}",
             "",
-            "Controls: W/S (Up/Down), A/D (Left/Right)",
         ]
         for i, text in enumerate(texts):
-            surface = self.font.render(text, True, Colors.WHITE)
+            surface = self.font.render(
+                text, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+            )
             self.screen.blit(surface, (10, 10 + i * 20))
+
+        self._visualizeThrust()
+
+        # Render controls after thrust bars
+        textControls = "Controls: W/S (Up/Down), A/D (Left/Right)"
+        sfControls = self.font.render(
+            textControls, True, (Colors.GRAY.R, Colors.GRAY.G, Colors.GRAY.B)
+        )
+        self.screen.blit(sfControls, (10, 10 + len(texts) * 20 + 60))
+
+        # Render expert status in top right if expert is active
+        if self.expert:
+            expertStatus = self.expert._getStatusLines(
+                self.expert.currTargetX,
+                self.expert.currTargetY,
+                self.expert.currDist,
+                self.expert.currTotalThrust,
+                self.expert.currMotorR,
+                self.expert.currMotorL,
+                self.expert.currThetaTarget,
+                self.expert.currTorque,
+            )
+            for i, line in enumerate(expertStatus):
+                surface = self.font.render(
+                    line, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+                )
+                self.screen.blit(surface, (1025, 10 + i * 20))
+
+    def _visualizeThrust(self):
+        """
+        Visualize the thrust levels of both rotors with colored bars.
+        """
+        barLength = 20
+        lThrust = self.drone.action.LEFT
+        rThrust = self.drone.action.RIGHT
+
+        lColor = self._thrustToColor(lThrust)
+        rColor = self._thrustToColor(rThrust)
+
+        # Calculate label widths
+        lLabelText = "Left Rotor Thrust: "
+        rLabelText = "Right Rotor Thrust: "
+        lLabel = self.font.render(
+            lLabelText, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+        rLabel = self.font.render(
+            rLabelText, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+
+        # Position bars
+        barStartX = 10 + max(lLabel.get_width(), rLabel.get_width()) + 10
+        barY1 = 10 + 5 * 20
+        barY2 = 10 + 6 * 20
+
+        # Render labels
+        self.screen.blit(lLabel, (10, barY1))
+        self.screen.blit(rLabel, (10, barY2))
+
+        # ---------------- RENDER: Left Rotor Bar ----------------
+        filledCount = int(lThrust * barLength)
+        emptyCount = barLength - filledCount
+
+        bracketLeft = self.font.render(
+            "[", True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+        filledBar = self.font.render("|" * filledCount, True, lColor)
+        emptyBar = self.font.render(
+            "|" * emptyCount, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+        bracketRight = self.font.render(
+            "]", True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+
+        currentX = barStartX
+        self.screen.blit(bracketLeft, (currentX, barY1))
+        currentX += bracketLeft.get_width()
+        self.screen.blit(filledBar, (currentX, barY1))
+        currentX += filledBar.get_width()
+        self.screen.blit(emptyBar, (currentX, barY1))
+        currentX += emptyBar.get_width()
+        self.screen.blit(bracketRight, (currentX, barY1))
+
+        # ---------------- RENDER: Right Rotor Bar ----------------
+        filledCount = int(rThrust * barLength)
+        emptyCount = barLength - filledCount
+
+        bracketLeft = self.font.render(
+            "[", True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+        filledBar = self.font.render("|" * filledCount, True, rColor)
+        emptyBar = self.font.render(
+            "|" * emptyCount, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+        bracketRight = self.font.render(
+            "]", True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+        )
+
+        currentX = barStartX
+        self.screen.blit(bracketLeft, (currentX, barY2))
+        currentX += bracketLeft.get_width()
+        self.screen.blit(filledBar, (currentX, barY2))
+        currentX += filledBar.get_width()
+        self.screen.blit(emptyBar, (currentX, barY2))
+        currentX += emptyBar.get_width()
+        self.screen.blit(bracketRight, (currentX, barY2))
 
 
 if __name__ == "__main__":

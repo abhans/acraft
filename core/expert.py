@@ -6,7 +6,7 @@ from core.controller import PIDController
 """
 Expert Controller for 2D Drone Positioning Simulator
 
-This class implements a PID-based expert controller tp simulate a skilled human pilot 
+This class implements a PID-based expert controller to simulate a skilled human pilot 
 with some imperfections.
 
 It's used to collect expert data to train the GAIL agent.
@@ -97,16 +97,39 @@ class Expert:
         motorR = np.clip(motorR, 0.0, 1.0)
         motorL = np.clip(motorL, 0.0, 1.0)
 
-        print(
-            f"[EXPERT] Target: ({targetX:.1f}, {targetY:.1f})".center(24),
-            f"Dist: {dist:.1f}".center(16),
-            f"Thrust: {totalThrust:.1f}".center(20),
-            f"ThetaTarget: {np.degrees(thetaTarget):.1f} deg".center(12),
-            f"Torque: {torque:.1f}".center(16),
-            f"MotorL: {motorL:.2f}".center(12),
-            f"MotorR: {motorR:.2f}".center(12),
-            sep=" | ",
-            end="\r",
+        # Store last status for HUD display
+        self.currTargetX = targetX
+        self.currTargetY = targetY
+        self.currDist = dist
+        self.currTotalThrust = totalThrust
+        self.currMotorR = motorR
+        self.currMotorL = motorL
+        self.currThetaTarget = thetaTarget
+        self.currTorque = torque
+
+        # Print expert status
+        status = self._getStatusLines(
+            targetX, targetY, dist, totalThrust, motorR, motorL, thetaTarget, torque
         )
+        print(f"\r\033[K{status[0]}")
+        for line in status[1:]:
+            print(line)
+
+        print("\033[8A", end="")
 
         return Action(motorL, motorR)
+
+    def _getStatusLines(
+        self, targetX, targetY, dist, totalThrust, motorR, motorL, thetaTarget, torque
+    ):
+        """Return list of status lines for display."""
+        return [
+            "[EXPERT]",
+            f"Target: ({targetX:5.1f}, {targetY:5.1f})",
+            f"Dist: {dist:6.1f}",
+            f"Thrust: {totalThrust:7.1f}",
+            f"├── Right: {motorR:5.2f}",
+            f"└── Left:  {motorL:5.2f}",
+            f"Theta: {np.degrees(thetaTarget):6.1f}°",
+            f"Torque: {torque:7.1f}",
+        ]
