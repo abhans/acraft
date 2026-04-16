@@ -81,11 +81,30 @@ class Action:
 
 
 @dataclass
+class Color:
+    """
+    Simple RGB color representation.
+    Values range from 0 to 255.
+    """
+
+    R: int
+    G: int
+    B: int
+
+
+@dataclass
 class Colors:
-    BLACK: tuple = (0, 0, 0)
-    WHITE: tuple = (255, 255, 255)
-    RED: tuple = (255, 50, 50)
-    BLUE: tuple = (50, 50, 255)
-    GRAY: tuple = (100, 100, 100)
-    GREEN: tuple = (50, 255, 50)
-    YELLOW: tuple = (255, 255, 50)
+    """
+    Predefined colors for rendering the drone and environment.
+    Used to visually indicate different states (e.g., thrust levels).
+    """
+
+    BLACK = Color(0, 0, 0)
+    WHITE = Color(255, 255, 255)
+    RED = Color(255, 50, 50)
+    BLUE = Color(50, 50, 255)
+    GRAY = Color(100, 100, 100)
+    GREEN = Color(50, 255, 50)
+    ORANGE = Color(255, 165, 0)
+    RED = Color(255, 50, 50)
+    YELLOW = Color(255, 255, 50)
