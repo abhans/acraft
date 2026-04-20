@@ -221,24 +221,6 @@ class Environment:
         )
         self.screen.blit(sfControls, (10, 10 + len(texts) * 20 + 60))
 
-        # Render expert status in top right if expert is active
-        if self.expert:
-            expertStatus = self.expert._getStatusLines(
-                self.expert.currTargetX,
-                self.expert.currTargetY,
-                self.expert.currDist,
-                self.expert.currTotalThrust,
-                self.expert.currMotorR,
-                self.expert.currMotorL,
-                self.expert.currThetaTarget,
-                self.expert.currTorque,
-            )
-            for i, line in enumerate(expertStatus):
-                surface = self.font.render(
-                    line, True, (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
-                )
-                self.screen.blit(surface, (1025, 10 + i * 20))
-
     def _visualizeThrust(self):
         """
         Visualize the thrust levels of both rotors with colored bars.

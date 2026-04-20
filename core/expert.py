@@ -107,29 +107,4 @@ class Expert:
         self.currThetaTarget = thetaTarget
         self.currTorque = torque
 
-        # Print expert status
-        status = self._getStatusLines(
-            targetX, targetY, dist, totalThrust, motorR, motorL, thetaTarget, torque
-        )
-        print(f"\r\033[K{status[0]}")
-        for line in status[1:]:
-            print(line)
-
-        print("\033[8A", end="")
-
         return Action(motorL, motorR)
-
-    def _getStatusLines(
-        self, targetX, targetY, dist, totalThrust, motorR, motorL, thetaTarget, torque
-    ):
-        """Return list of status lines for display."""
-        return [
-            "[EXPERT]",
-            f"Target: ({targetX:5.1f}, {targetY:5.1f})",
-            f"Dist: {dist:6.1f}",
-            f"Thrust: {totalThrust:7.1f}",
-            f"├── Right: {motorR:5.2f}",
-            f"└── Left:  {motorL:5.2f}",
-            f"Theta: {np.degrees(thetaTarget):6.1f}°",
-            f"Torque: {torque:7.1f}",
-        ]
