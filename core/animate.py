@@ -22,7 +22,7 @@ def _thrustColors(thrust):
     return plt.cm.managua(thrust)
 
 
-def createTrajAnim(dExpert, outFile="data/simulateTrajs.mp4"):
+def createTrajAnim(dExpert, outFile="animations/simulateTrajs.mp4"):
     """
     Stitches all trajectories into a single MP4 with plot resets between them.
     """
