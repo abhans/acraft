@@ -3,12 +3,20 @@ from dataclasses import dataclass
 import numpy as np
 
 WAYPOINTS: list[tuple[int, ...]] = [
+    # -------- Boundary & Sweeping Turns --------
+    (1100, 200),  # Test boundary approach
+    (1000, 650),  # Test steep 45-degree dive
+    (400, 700),  # Test long lateral translation
+    # -------- Extreme Altitudes & Verticals --------
+    (100, 150),  # Test extreme boundary
+    (100, 650),  # Test pure vertical drop
+    # -------- Symmetry & Precision --------
+    (1000, 150),  # Test horizontal sweep across the top
+    (1000, 650),  # Test pure vertical drop
+    # -------- Center Precision & Hovering --------
+    (600, 200),  # Test deadzone and noise on Y-axis
+    (600, 600),  # Test pure vertical descent
     (600, 400),
-    (800, 300),
-    (900, 500),
-    (600, 600),
-    (300, 400),
-    (400, 200),
 ]
 
 
