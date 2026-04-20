@@ -1,8 +1,9 @@
 import math
 import os
-import time
+import random
 
 import numpy as np
+from tqdm import tqdm
 
 from core.config import Physics, Screen
 from core.env import Environment
@@ -33,21 +34,42 @@ class DataCollector:
         )
 
     def initiate(self, environment):
-        # Reset environment state for a fresh trajectory
-        environment.drone.state = np.array(
-            [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0, 0, 0, 0], dtype=np.float64
-        )
-        environment.expert.currWaypointIdx = 0
+        if random.random() < 0.5:
+            environment.drone.state = np.array(
+                [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0, 0, 0, 0], dtype=np.float64
+            )
 
+        # Start from a random position and velocity
+        else:
+            # Pick a random position on the screen
+            initX = random.uniform(
+                Screen.MARGIN + 50, Screen.WIDTH - Screen.MARGIN - 50
+            )
+            initY = random.uniform(
+                Screen.MARGIN + 50, Screen.HEIGHT - Screen.MARGIN - 50
+            )
+            # Pick a random initial tilt and velocity
+            initVx = random.uniform(-200, 200)
+            initVy = random.uniform(-200, 200)
+            initTheta = random.uniform(-0.3, 0.3)  # Up to ~17 degrees off axis
+
+            environment.drone.state = np.array(
+                [initX, initY, initVx, initVy, initTheta, 0.0], dtype=np.float64
+            )
+
+        environment.expert.currWaypointIdx = 0
         return list()
 
     def collect(self):
         env = Environment(useExpert=True, render=False)
 
-        print(f"[DATA] Collecting {self.numTrajec} trajectories...")
-
-        for idxTrajec in range(self.numTrajec):
-            # List to hold transitions for this trajectory
+        # Wrap the range() in tqdm for a beautiful progress bar
+        for idxTrajec in tqdm(
+            range(self.numTrajec),
+            desc="[DATA] Collecting Trajectories",
+            unit="traj",
+            ncols=100,
+        ):
             dataTrajec = self.initiate(env)
 
             for step in range(self.stepsPerTrajec):
@@ -69,8 +91,6 @@ class DataCollector:
 
             # Trajectory : (steps, transition)
             self.allTrajec.append(np.array(dataTrajec))
-            print(f"\n[DATA] Completed trajectory ::: {idxTrajec + 1}/{self.numTrajec}")
-            time.sleep(0.1)
 
         print("\n[DATA] Collection complete!")
 
@@ -85,7 +105,7 @@ class DataCollector:
 
         transitionTotal = sum(trajec.shape[0] for trajec in self.allTrajec)
         print(
-            f"[SAVE] Saved {len(self.allTrajec)} trajectories",
+            f"\n[SAVE] Saved {len(self.allTrajec)} trajectories",
             f"({transitionTotal} transitions) to '{filepath}'",
         )
         print(f"[SAVE] Shape per trajectory: {self.allTrajec[0].shape}")
