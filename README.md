@@ -21,3 +21,9 @@ To validate the expert data, it can be animated using `animate.py` script:
 ```bash
 python -W ignore -m data.animate
 ```
+
+Both these scripts can be run in sequence to **first generate the new data** and then **animating it.**
+
+```bash
+python -W ignore -m core.collector; python -W ignore -m data.animate
+```

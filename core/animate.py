@@ -118,7 +118,7 @@ def createTrajAnim(dExpert, outFile="animations/simulateTrajs.mp4"):
                 ax.set_xlim(0, len(dataTraj))
 
             # Update titles to show progress
-            axTraj.set_title(f"Trajectory {idxTraj + 1}/{numTraj}")
+            axTraj.set_title(f"Trajectory {idxTraj + 1} (out of {numTraj})")
 
         # Extract current state
         X, Y = dataTraj[:, 0], dataTraj[:, 1]
@@ -184,7 +184,7 @@ def createTrajAnim(dExpert, outFile="animations/simulateTrajs.mp4"):
     anim = animation.FuncAnimation(fig, update, frames=tFrames, interval=30, blit=False)
 
     with tqdm(
-        total=tFrames, desc="Animating Trajectories", unit=" frame", ncols=250
+        total=tFrames, desc="Animating Trajectories", unit=" frame", ncols=100
     ) as pbar:
         anim.save(
             outFile,

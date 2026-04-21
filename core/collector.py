@@ -67,7 +67,7 @@ class DataCollector:
         for idxTrajec in tqdm(
             range(self.numTrajec),
             desc="[DATA] Collecting Trajectories",
-            unit="traj",
+            unit=" traj",
             ncols=100,
         ):
             dataTrajec = self.initiate(env)
