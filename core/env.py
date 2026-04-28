@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import pygame
+import gymnasium as gym
 from gymnasium import spaces
 
 from core.config import Action, Colors, Physics, Screen
@@ -10,8 +11,9 @@ from core.drone import Drone
 from core.expert import Expert
 
 
-class Environment:
+class Environment(gym.Env):
     def __init__(self, useExpert=False, render=True, stepsMax=500):
+        super(Environment, self).__init__()
         # Render flag to open/close PyGame rendering
         self.render = render
         self.stepsMax = stepsMax
