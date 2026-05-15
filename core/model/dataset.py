@@ -29,7 +29,7 @@ def getExpertDataloader(path: str, params: params.Params) -> DataLoader:
     return DataLoader(
         dataset,
         batch_size=params.BATCH_SIZE,
-        shuffle=True,
         drop_last=True,
+        num_workers=-1,
         # Other params if needed
     )
