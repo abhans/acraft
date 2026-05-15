@@ -1,17 +1,24 @@
 import math
 import os
+import random
 
+import gymnasium as gym
+import numpy as np
 import pygame
+from gymnasium import spaces
 
 from core.config import Action, Colors, Physics, Screen
 from core.drone import Drone
 from core.expert import Expert
 
 
-class Environment:
-    def __init__(self, useExpert=False, render=True):
+class Environment(gym.Env):
+    def __init__(self, useExpert=False, render=True, stepsMax=500):
+        super(Environment, self).__init__()
         # Render flag to open/close PyGame rendering
         self.render = render
+        self.stepsMax = stepsMax
+        self.currStep = 0
 
         if self.render:
             pygame.init()
@@ -24,6 +31,92 @@ class Environment:
         self.drone = Drone(Screen.WIDTH / 2, Screen.HEIGHT / 2)
         # Expert for auto-piloting & data collection
         self.expert = Expert() if useExpert else None
+
+        # Actions and Spaces
+        self.spAction = spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32)
+        self.spObservation = spaces.Box(
+            low=-1.0, high=1.0, shape=(6,), dtype=np.float32
+        )
+
+    def _normalizeState(self, state) -> np.ndarray:
+        x, y, vx, vy, theta, omega = state
+        normX = (x - Screen.WIDTH / 2) / (Screen.WIDTH / 2)
+        normY = (y - Screen.HEIGHT / 2) / (Screen.HEIGHT / 2)
+        normVx = np.clip(vx / 1000.0, -1.0, 1.0)
+        normVy = np.clip(vy / 1000.0, -1.0, 1.0)
+        normTheta = theta / math.pi
+        # Omega is normalized by an estimated max angular velocity (5 rad/s)
+        normOmega = np.clip(omega / 5.0, -1.0, 1.0)
+
+        return np.array(
+            [normX, normY, normVx, normVy, normTheta, normOmega], dtype=np.float32
+        )
+
+    def reset(self, seed=None, options=None) -> tuple[np.ndarray, dict]:
+        # Seed for Gymnasium environment
+        super().reset(seed=seed)
+
+        isRandomStart: bool = False
+
+        if options is not None:
+            isRandomStart = options.get("randomStart", False)
+        elif self.expert:
+            isRandomStart = True
+
+        if not isRandomStart:
+            self.drone.state = np.array(
+                [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0.0, 0.0, 0.0, 0.0],
+                dtype=np.float64,
+            )
+
+        else:
+            # ---- RANODM INITIALIZATION ----
+            #   (Same with the DataCollector)
+
+            initX = random.uniform(
+                Screen.MARGIN + 50, Screen.WIDTH - Screen.MARGIN - 50
+            )
+            initY = random.uniform(
+                Screen.MARGIN + 50, Screen.HEIGHT - Screen.MARGIN - 50
+            )
+            # Pick a random initial tilt and velocity
+            initVx = random.uniform(-200, 200)
+            initVy = random.uniform(-200, 200)
+            initTheta = random.uniform(-0.3, 0.3)  # Up to ~17 degrees off axis
+
+            self.drone.state = np.array(
+                [initX, initY, initVx, initVy, initTheta, 0.0], dtype=np.float64
+            )
+
+        if self.expert:
+            self.expert.currWaypointIdx = 0
+
+        self.currStep = 0
+        normState = self._normalizeState(self.drone.state)
+
+        return normState, {}
+
+    def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
+        self.currStep += 1
+
+        if isinstance(action, np.ndarray):
+            action = Action(*action)
+
+        self.drone.step(action)
+        self._enforceBoundaries()
+
+        normState = self._normalizeState(self.drone.state)
+        reward = 0.0
+        terminated = False
+        isDone = self.currStep >= self.stepsMax
+
+        return normState, reward, terminated, isDone, {"rawState": self.drone.state}
+
+    def getExpertAction(self) -> np.ndarray:
+        if self.expert:
+            return self.expert.getAction(self.drone.state, Physics.DT).to_numpy()
+        else:
+            raise ValueError("Environment not initialized with an expert controller.")
 
     def _enforceBoundaries(self):
         """Keeps drone on screen and stops velocity on impact"""
@@ -62,7 +155,7 @@ class Environment:
 
             # For expert control
             if self.expert:
-                action = self.expert.getAction(self.drone.state, Physics.DT)
+                action = self.getExpertAction()
 
             else:
                 keys = pygame.key.get_pressed()
@@ -77,9 +170,8 @@ class Environment:
                 if keys[pygame.K_DOWN]:
                     action.RIGHT = 0.0
 
-            # Physics Step
-            self.drone.step(action)
-            self._enforceBoundaries()
+            # Physics step
+            normStates, _, isDone, info = self.step(action)
 
             # Render
             if self.render:

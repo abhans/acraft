@@ -9,4 +9,8 @@ wheels/
 # Virtual environments
 .venv
 data/
-animations/
+animations/*.mp4
+*.pdf
+
+# Tests
+tests/
