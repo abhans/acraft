@@ -1,9 +1,10 @@
 import math
 import os
+import random
 
+import gymnasium as gym
 import numpy as np
 import pygame
-import gymnasium as gym
 from gymnasium import spaces
 
 from core.config import Action, Colors, Physics, Screen
@@ -51,20 +52,51 @@ class Environment(gym.Env):
             [normX, normY, normVx, normVy, normTheta, normOmega], dtype=np.float32
         )
 
-    def reset(self) -> None:
-        self.drone.state = np.array(
-            [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0.0, 0.0, 0.0, 0.0], dtype=np.float64
-        )
+    def reset(self, seed=None, options=None) -> tuple[np.ndarray, dict]:
+        # Seed for Gymnasium environment
+        super().reset(seed=seed)
+
+        isRandomStart: bool = False
+
+        if options is not None:
+            isRandomStart = options.get("randomStart", False)
+        elif self.expert:
+            isRandomStart = True
+
+        if not isRandomStart:
+            self.drone.state = np.array(
+                [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0.0, 0.0, 0.0, 0.0],
+                dtype=np.float64,
+            )
+
+        else:
+            # ---- RANODM INITIALIZATION ----
+            #   (Same with the DataCollector)
+
+            initX = random.uniform(
+                Screen.MARGIN + 50, Screen.WIDTH - Screen.MARGIN - 50
+            )
+            initY = random.uniform(
+                Screen.MARGIN + 50, Screen.HEIGHT - Screen.MARGIN - 50
+            )
+            # Pick a random initial tilt and velocity
+            initVx = random.uniform(-200, 200)
+            initVy = random.uniform(-200, 200)
+            initTheta = random.uniform(-0.3, 0.3)  # Up to ~17 degrees off axis
+
+            self.drone.state = np.array(
+                [initX, initY, initVx, initVy, initTheta, 0.0], dtype=np.float64
+            )
 
         if self.expert:
             self.expert.currWaypointIdx = 0
 
         self.currStep = 0
-        self._normalizeState(self.drone.state)
+        normState = self._normalizeState(self.drone.state)
 
-        return
+        return normState, {}
 
-    def step(self, action) -> tuple[np.ndarray, float, bool, dict]:
+    def step(self, action) -> tuple[np.ndarray, float, bool, bool, dict]:
         self.currStep += 1
 
         if isinstance(action, np.ndarray):
@@ -75,9 +107,10 @@ class Environment(gym.Env):
 
         normState = self._normalizeState(self.drone.state)
         reward = 0.0
+        terminated = False
         isDone = self.currStep >= self.stepsMax
 
-        return normState, reward, isDone, {"rawState": self.drone.state}
+        return normState, reward, terminated, isDone, {"rawState": self.drone.state}
 
     def getExpertAction(self) -> np.ndarray:
         if self.expert:
