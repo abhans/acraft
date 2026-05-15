@@ -10,7 +10,7 @@ from core.env import Environment
 
 
 class DataCollector:
-    def __init__(self, numTrajec=20, stepsPerTrajec=300):
+    def __init__(self, numTrajec=100, stepsPerTrajec=500):
         self.numTrajec: int = numTrajec
         self.stepsPerTrajec: int = stepsPerTrajec
         self.allTrajec: list[np.ndarray] = []
@@ -34,28 +34,17 @@ class DataCollector:
         )
 
     def initiate(self, environment):
-        if random.random() < 0.5:
-            environment.drone.state = np.array(
-                [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0, 0, 0, 0], dtype=np.float64
-            )
-
         # Start from a random position and velocity
-        else:
-            # Pick a random position on the screen
-            initX = random.uniform(
-                Screen.MARGIN + 50, Screen.WIDTH - Screen.MARGIN - 50
-            )
-            initY = random.uniform(
-                Screen.MARGIN + 50, Screen.HEIGHT - Screen.MARGIN - 50
-            )
-            # Pick a random initial tilt and velocity
-            initVx = random.uniform(-200, 200)
-            initVy = random.uniform(-200, 200)
-            initTheta = random.uniform(-0.3, 0.3)  # Up to ~17 degrees off axis
+        initX = random.uniform(Screen.MARGIN + 50, Screen.WIDTH - Screen.MARGIN - 50)
+        initY = random.uniform(Screen.MARGIN + 50, Screen.HEIGHT - Screen.MARGIN - 50)
+        # Pick a random initial tilt and velocity
+        initVx = random.uniform(-200, 200)
+        initVy = random.uniform(-200, 200)
+        initTheta = random.uniform(-0.3, 0.3)  # Up to ~17 degrees off axis
 
-            environment.drone.state = np.array(
-                [initX, initY, initVx, initVy, initTheta, 0.0], dtype=np.float64
-            )
+        environment.drone.state = np.array(
+            [initX, initY, initVx, initVy, initTheta, 0.0], dtype=np.float32
+        )
 
         environment.expert.currWaypointIdx = 0
         return list()
@@ -78,8 +67,7 @@ class DataCollector:
                 # Get expert action
                 action = env.expert.getAction(currState, Physics.DT)
 
-                env.drone.step(action)
-                env._enforceBoundaries()
+                env.step(action)
 
                 # Process data for GAIL training
                 normState = self.normalizeState(currState)
