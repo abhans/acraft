@@ -40,7 +40,7 @@ class Wind:
     SPEED: float = 150.0            # Base wind speed (pixels/s^2)
     DIRECTION: float = 0.0          # Wind angle in radians (0.0 = Right, pi/2 = Up, pi = Left)
     TURBULENCE: float = 0.1         # How rapidly the wind changes speed and direction over time
-    GUST_STRENGTH: float = 8.0     # Maximum gust strength added to the base wind (pixels/s^2)
+    GUST_STRENGTH: float = 8.0      # Maximum gust strength added to the base wind (pixels/s^2)
     DRIFT_SPEED: float = 0.005      # Drift speed for slow, constant wind changes (pixels/s^2)
     DRIFT_DIR_SPEED: float = 0.003  # How quickly the drift direction changes (radians/s)
 
