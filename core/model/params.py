@@ -19,7 +19,7 @@ class Paths:
         # ------------ Paths for the Model ------------
         self.TEST = self._TESTS / self.getCurrentTest()
         self.WEIGHTS = self.TEST / "policy.pth"
-        self.METRICS = self.TEST / "metrics.json"
+        self.METRICS = self.TEST / "metrics.csv"
 
     def ensureDirs(self):
         """Creates parent directories if they don't exist."""
@@ -42,34 +42,31 @@ class Paths:
 class Update:
     """
     Controls the ratio of network updates per training iteration.
-    Doing multiple Discriminator updates per Generator update is a
-    common trick to prevent the Discriminator from overpowering the Policy.
+    For every 1 buffer rollout, we perform <GENERATOR> PPO updates.
     """
-
     GENERATOR: int = 3
-    DISCRIMINATOR: int = 1
 
 
 @dataclass
 class Params:
     """
-    Hyperparameters for GAIL training based on PPO.
+    Hyperparameters for PPO training (without GAIL).
     """
 
     PATHS: Paths = Paths()
     # --- Optimizers ---
-    LR: float = 4.0e-5
-    LR_DISCRIMINATOR: float = 5e-6
+    LR: float = 3e-4                # Learning rate for both Policy and Critic
     # --- Environment & Buffer ---
-    BUFFER_SIZE: int = 1024  # Steps collected per iteration
-    GAMMA: float = 0.99  # Discount factor for future rewards
-    LAMBDA_GAE: float = 0.95  # GAE smoothing parameter (replaces WGAN-GP lambda)
+    BUFFER_SIZE: int = 4096         # Steps collected per iteration
+    GAMMA: float = 0.99             # Discount factor for future rewards
+    LAMBDA_GAE: float = 0.95        # GAE smoothing parameter
     # --- PPO Specifics ---
-    PPO_EPOCHS: int = 6  # Times to loop over the buffer per update
-    BATCH_SIZE: int = 64  # Minibatch size for PPO
-    CLIP_EPSILON: float = 0.20  # PPO clipping parameter (epsilon)
-    COEFF_VALUE: float = 1.0  # Weight for the Critic's MSE loss
-    COEFF_ENTROPY: float = 0.2  # Weight for the Entropy bonus (lambda in GAIL paper)
+    PPO_EPOCHS: int = 4             # Times to loop over the buffer per update
+    BATCH_SIZE: int = 256           # Minibatch size for PPO
+    CLIP_EPSILON: float = 0.2       # PPO clipping parameter (epsilon)
+    COEFF_VALUE: float = 1.0        # Weight for the Critic's MSE loss
+    COEFF_ENTROPY: float = 0.015    # Weight for the Entropy bonus
     # --- Training Loop ---
-    UPDATES: Update = field(default_factory=Update)  # Update ratios
-    ITERATIONS: int = 500  # Total number of times to collect a buffer and update
+    # Update ratios
+    UPDATES: Update = field(default_factory=Update)
+    ITERATIONS: int = 1000          # Total number of times to collect a buffer and update

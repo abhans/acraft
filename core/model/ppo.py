@@ -2,12 +2,14 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
+from core.model.critic import Critic, Policy
+
 
 class RolloutBuffer:
     def __init__(
         self,
         sBuffer: int,
-        dimState: int = 6,
+        dimState: int = 8,
         dimAction: int = 2,
         gamma: float = 0.99,
         lambdaGAE: float = 0.95,
@@ -16,6 +18,7 @@ class RolloutBuffer:
         self.sBuffer = sBuffer
         self.gamma = gamma
         self.lambdaGAE = lambdaGAE
+        self.device = device
         self.ptr = 0
 
         self.states = torch.zeros(
@@ -35,20 +38,29 @@ class RolloutBuffer:
     def store(self, state, action, reward, done, probs):
         if self.ptr >= self.sBuffer:
             raise RuntimeError("Rollout buffer is full.")
-        self.states[self.ptr] = state
-        self.actions[self.ptr] = action
-        self.rewards[self.ptr] = reward
-        self.dones[self.ptr] = done
-        self.oldProbs[self.ptr] = probs
+        
+        self.states[self.ptr] = state.detach()
+        self.actions[self.ptr] = action.detach()
+        
+        # Convert reward to torch tensor if it's a numpy scalar
+        self.rewards[self.ptr] = float(reward)
+        self.dones[self.ptr] = float(done)
+        self.oldProbs[self.ptr] = probs.detach()
         # Increment the pointer
         self.ptr += 1
 
-    def computeAdvantages(self, values: torch.Tensor, lastVal: float, doneLast: bool):
+    def computeAdvantages(self, values: torch.Tensor, lastVal: torch.Tensor, doneLast: bool):
         """
         Computes GAE.
         'values' should be the Critic's predictions for self.states[:self.ptr]
         """
-        lastGAE = 0.0
+        if self.ptr == 0:
+            raise RuntimeError("RolloutBuffer is empty.")
+
+        lastGAE = torch.tensor(0.0, device=self.device)
+
+        values = values.detach()
+        lastVal = lastVal.detach()
 
         for step in reversed(range(self.ptr)):
             if step == self.ptr - 1:
@@ -65,7 +77,13 @@ class RolloutBuffer:
                 - values[step]
             )
 
-            lastGAE = delta + self.gamma * self.lambdaGAE * nextNonterminal * lastGAE
+            lastGAE = (
+                delta 
+                + self.gamma 
+                * self.lambdaGAE 
+                * nextNonterminal 
+                * lastGAE
+            )
             self.advantages[step] = lastGAE
 
             # Return Advantage + Value
@@ -85,8 +103,8 @@ class RolloutBuffer:
 
 
 def updatePPO(
-    policy: nn.Module,
-    critic: nn.Module,
+    policy: Policy,
+    critic: Critic,
     optimizerPolicy: torch.optim.Optimizer,
     optimizerCritic: torch.optim.Optimizer,
     bufferData: tuple,
@@ -100,13 +118,17 @@ def updatePPO(
     Performs the PPO update step.
     """
     states, actions, advantages, returns, oldProbs = bufferData
+    
+    if len(states) == 0:
+        raise RuntimeError("Empty PPO buffer.")
 
     # Normalize Advantages to keep training stable
     advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
-
+    
     totalPolicyLoss = 0.0
     totalValueLoss = 0.0
     totalEntropy = 0.0
+    numUpdates = 0
 
     # PPO Epochs
     for _ in range(epochs):
@@ -116,10 +138,6 @@ def updatePPO(
         # Mini-batches
         for start in range(0, len(states), sMinibatch):
             end = start + sMinibatch
-
-            # Skip incomplete mini-batches
-            if end > len(states):
-                break
 
             # Data to be processed in minibatches
             mbIndices = indices[start:end]
@@ -136,11 +154,9 @@ def updatePPO(
             # Calculate the ratio: exp(log_pi_new - log_pi_old)
             ratio = torch.exp(newProbs - mbOldProbs)
 
-            # PPO Clipped Surrogate Objective (Eq. 7)
+            # PPO Clipped Surrogate Objective
             surrogate1 = ratio * mbAdvantages
-            surrogate2 = (
-                torch.clamp(ratio, 1.0 - clipEpsilon, 1.0 + clipEpsilon) * mbAdvantages
-            )
+            surrogate2 = torch.clamp(ratio, 1.0 - clipEpsilon, 1.0 + clipEpsilon) * mbAdvantages
 
             # We want to MAXIMIZE this, so we take the min and add a negative sign for the optimizer
             policyLoss = -torch.min(surrogate1, surrogate2).mean()
@@ -159,7 +175,11 @@ def updatePPO(
 
             # ------------------- BACKPROPAGATION -------------------
             # Total PPO Loss
-            loss = policyLoss + coeffValue * valueLoss - coeffEntropy * entropyMean
+            loss = (
+                policyLoss
+                + coeffValue * valueLoss
+                - coeffEntropy * entropyMean
+            )
 
             optimizerPolicy.zero_grad()
             optimizerCritic.zero_grad()
@@ -178,8 +198,10 @@ def updatePPO(
             totalValueLoss += valueLoss.item()
             totalEntropy += entropyMean.item()
 
+            # Increment the number of updates for averaging
+            numUpdates += 1
+
     # Return averages over the entire update
-    numUpdates = epochs * (len(states) // sMinibatch)
     return {
         "policyLoss": totalPolicyLoss / numUpdates,
         "valueLoss": totalValueLoss / numUpdates,

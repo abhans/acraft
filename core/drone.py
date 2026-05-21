@@ -22,19 +22,18 @@ This class simulates a 2D drone with realistic physics using pixel units.
 
 class Drone:
     def __init__(self, x, y):
-        self.state = np.array([x, y, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
+        self.state = np.array([x, y, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], dtype=np.float64)
         self.action = Action()
 
-    def step(self, action):
+    def step(self, action, wind=(0.0, 0.0)):
         self.action = self._handleAction(action)
         # Convert 0-1 actions to actual force values
         thrustLeft = self.action.LEFT * Physics.MAX_THRUST
         thrustRight = self.action.RIGHT * Physics.MAX_THRUST
 
-        x, y, vx, vy, theta, omega = self.state
+        x, y, vx, vy, theta, omega = self.state[:6]
 
         # ------------------------ ROTATIONAL DYNAMICS ------------------------
-        # ! The hard part for GAIL to learn.
         # Calculate the effective torque (Force * Arm Length)
         # * Positive = Clockwise
         torque = Physics.ARM_LENGTH * (thrustRight - thrustLeft)
@@ -43,6 +42,7 @@ class Drone:
         alpha = torque / Physics.INERTIA
         omega += (alpha * Physics.DT) * Drag.ANGULAR
 
+        # Update orientation angle
         theta += omega * Physics.DT
         theta = (theta + math.pi) % (2 * math.pi) - math.pi
 
@@ -53,9 +53,12 @@ class Drone:
         fThrustX = thrustTotal * math.sin(theta)
         fThrustY = -thrustTotal * math.cos(theta)
 
+        # Add wind forces
+        windFx, windFy = wind
+
         # Linear acceleration (Force / Mass)
-        ax = fThrustX / Physics.MASS
-        ay = (fThrustY + Physics.GRAVITY) / Physics.MASS
+        ax = (fThrustX + windFx) / Physics.MASS
+        ay = (fThrustY + Physics.GRAVITY + windFy) / Physics.MASS
 
         # Update linear velocity
         vx += (ax * Physics.DT) * Drag.LINEAR
@@ -65,7 +68,9 @@ class Drone:
         x += vx * Physics.DT
         y += vy * Physics.DT
 
-        self.state = np.array([x, y, vx, vy, theta, omega], dtype=np.float32)
+        self.state = np.array(
+            [x, y, vx, vy, theta, omega, windFx, windFy], dtype=np.float32
+        )
         return self.state
 
     def _handleAction(self, action):

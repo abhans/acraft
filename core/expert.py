@@ -26,6 +26,11 @@ class Expert:
         # ------------------------ Inner Loop (Desired Tilt to Motor Differential) ------------------------
         self.thetaPID = PIDController(kP=200.0, kD=95.0, limit=700.0)
 
+        # Base PID values for randomization (to generate diverse trajectories)
+        self._baseX = (0.012, 0.04, 0.0)
+        self._baseY = (3.5, 3.0, 0.0)
+        self._baseTheta = (200.0, 95.0, 0.0)
+
         # Waypoints for the expert to follow.
         self.waypoints = WAYPOINTS
         self.currWaypointIdx = 0
@@ -45,8 +50,52 @@ class Expert:
 
         return error - (np.sign(error) * threshold)
 
+    def randomize(self):
+        """
+        Randomize PID gains slightly to generate diverse expert behaviors.
+        Called once per trajectory.
+        """
+        xP, xD, xI = self._baseX
+        yP, yD, yI = self._baseY
+        tP, tD, tI = self._baseTheta
+
+        # ---------------- Y PID ----------------
+        self.yPID.kP = yP * np.random.uniform(0.9, 1.1)
+        self.yPID.kD = yD * np.random.uniform(0.9, 1.1)
+        self.yPID.kI = yI
+
+        # ---------------- X PID ----------------
+        self.xPID.kP = xP * np.random.uniform(0.85, 1.15)
+        self.xPID.kD = xD * np.random.uniform(0.85, 1.15)
+        self.xPID.kI = xI
+
+        # ---------------- Theta PID ----------------
+        self.thetaPID.kP = tP * np.random.uniform(0.9, 1.1)
+        self.thetaPID.kD = tD * np.random.uniform(0.9, 1.1)
+        self.thetaPID.kI = tI
+
+        # ---------------- Human Imperfections ----------------
+        self._motorNoise = np.random.uniform(0.01, 0.02)
+
+        self._positionDeadzone = np.random.uniform(0.5, 1.5)
+
+        self._angleDeadzone = np.radians(
+            np.random.uniform(1.5, 3.5)
+        )
+
+        # Reset PID integrals to prevent carryover between trajectories
+        self.yPID.integral = 0
+        self.xPID.integral = 0
+        self.thetaPID.integral = 0
+
+        self.yPID.errPrev = 0
+        self.xPID.errPrev = 0
+        self.thetaPID.errPrev = 0
+
+        return
+
     def getAction(self, state, dt):
-        x, y, vx, vy, theta, omega = state
+        x, y, vx, vy, theta, omega = state[:6]
         targetX, targetY = self.waypoints[self.currWaypointIdx]
 
         # Switch waypoint if reached
