@@ -17,9 +17,9 @@ class Environment(gym.Env):
     def __init__(self, useExpert=False, render=True, stepsMax=500):
         super(Environment, self).__init__()
         # Render flag to open/close PyGame rendering
-        self.render = render
-        self.stepsMax = stepsMax
-        self.currStep = 0
+        self.render: bool = render
+        self.stepsMax: int = stepsMax
+        self.currStep: int = 0
 
         if self.render:
             pygame.init()
@@ -29,17 +29,22 @@ class Environment(gym.Env):
             self.font = pygame.font.SysFont("JetBrains Mono", 12)
 
         # Start drone in the middle
-        self.drone = Drone(Screen.WIDTH / 2, Screen.HEIGHT / 2)
+        self.drone: Drone = Drone(
+            Screen.WIDTH / 2,
+            Screen.HEIGHT / 2
+        )
         # Expert for auto-piloting & data collection
-        self.expert = Expert() if useExpert else None
+        self.expert: Expert | None = Expert() if useExpert else None
 
         # Waypoint tracking for reward computation
         self.waypoints: list[tuple[int, ...]] = WAYPOINTS
         self.currWaypointIdx: int = 0
         self.waypointThresh: float = 10.0  # In Pixels
         self.waypointWinds: dict = {}  # Store wind conditions per waypoint
+        self._waypointBonusGiven: bool = False
+        self.cycleWaypoints: bool = True
 
-        # The Wind Effect
+        # -------- The Wind Effects --------
         self.windDirection: float = 0.0
         self.targetWindDirection: float = 0.0
 
@@ -47,39 +52,54 @@ class Environment(gym.Env):
         self.targetWindSpeed: float = Wind.SPEED
 
         self.time: float = 0.0
-        self.hitBoundary: bool = False
 
         # Actions and Spaces
+        # TODO: These variables are not used anywhere! Likely that something is missing
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(8,), dtype=np.float32
         )
 
-    def _normalizeState(self, state, target) -> np.ndarray:
+    def _normalizeState(self, state) -> np.ndarray:
         x, y, vx, vy, theta, omega, windFx, windFy = state
-        targetX, targetY = target
+        
+        absX = (x - Screen.WIDTH / 2) / (Screen.WIDTH / 2)
+        absY = (y - Screen.HEIGHT / 2) / (Screen.HEIGHT / 2) 
 
-        # Calculate relative position to the target
-        dx = targetX - x
-        dy = targetY - y
+        normX = np.clip(absX, -1.0, 1.0)
+        normY = np.clip(absY, -1.0, 1.0)
 
-        normDx = np.clip(dx / Screen.WIDTH, -1.0, 1.0)
-        normDy = np.clip(dy / Screen.HEIGHT, -1.0, 1.0)
+        normVx = np.clip(
+            (vx / 1500.0),
+            -1.0, 1.0
+        )
+        normVy = np.clip(
+            (vy / 1500.0),
+            -1.0, 1.0
+        )
 
-        normVx = np.clip(vx / 1000.0, -1.0, 1.0)
-        normVy = np.clip(vy / 1000.0, -1.0, 1.0)
-        normTheta = np.clip(theta / math.pi, -1.0, 1.0)
-        # Omega is normalized by an estimated max angular velocity (5 rad/s)
-        normOmega = np.clip(omega / 5.0, -1.0, 1.0)
+        normTheta = np.clip(
+            (theta / math.pi),
+            -1.0, 1.0
+        )
+        normOmega = np.clip(
+            (omega / 10.0),
+            -1.0, 1.0
+        )
 
-        # Normalize wind forces (assuming max ~200 pixels/s^2)
-        normWindFx = np.clip(windFx / 300.0, -1.0, 1.0)
-        normWindFy = np.clip(windFy / 300.0, -1.0, 1.0)
+        normWindFx = np.clip(
+            (windFx / 25.0),
+            -1.0, 1.0
+        )
+        normWindFy = np.clip(
+            (windFy / 25.0),
+            -1.0, 1.0
+        )
 
         return np.array(
             [
-                normDx,
-                normDy,
+                normX,
+                normY,
                 normVx,
                 normVy,
                 normTheta,
@@ -90,19 +110,20 @@ class Environment(gym.Env):
             dtype=np.float32,
         )
 
-    def reset(self, seed=None, options=None) -> tuple[np.ndarray, dict]:
+    def reset(self, seed: int = 42, options: dict | None = None) -> tuple[np.ndarray, dict]:
         # Seed for Gymnasium environment
         super().reset(seed=seed)
 
         # Generate random wind conditions for each waypoint
         self.waypointWinds = {}
         for i in range(len(self.waypoints)):
-            direction = Wind.DIRECTION + random.uniform(-math.pi / 4, math.pi / 4)
-            speed = Wind.SPEED + random.uniform(-50, 50)
+            direction = Wind.DIRECTION + random.uniform(-math.pi, math.pi)
+            speed = Wind.SPEED + random.uniform(-100, 100)
             self.waypointWinds[i] = (direction, speed)
 
+        flogger.info(f"[WIND] Waypoint Winds: {self.waypointWinds}")
+
         # Set initial wind from first waypoint
-        self.currWaypointIdx = 0
         self.targetWindDirection, self.targetWindSpeed = self.waypointWinds[0]
         
         self.windDirection = self.targetWindDirection
@@ -112,9 +133,11 @@ class Environment(gym.Env):
 
         if options is not None:
             isRandomStart = options.get("randomStart", False)
+        # If expert, start from a random coordinate
         elif self.expert:
             isRandomStart = True
 
+        # -------- STARTING CONDITIONS --------
         if not isRandomStart:
             self.drone.state = np.array(
                 [Screen.WIDTH / 2, Screen.HEIGHT / 2, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
@@ -122,18 +145,16 @@ class Environment(gym.Env):
             )
 
         else:
-            # ---- RANODM INITIALIZATION ----
-            #   (Same with the DataCollector)
             initX = random.uniform(
-                Screen.MARGIN + 50, Screen.WIDTH - Screen.MARGIN - 50
+                Screen.MARGIN + 100, Screen.WIDTH - Screen.MARGIN - 100
             )
             initY = random.uniform(
-                Screen.MARGIN + 50, Screen.HEIGHT - Screen.MARGIN - 50
+                Screen.MARGIN + 100, Screen.HEIGHT - Screen.MARGIN - 100
             )
             # Pick a random initial tilt and velocity
-            initVx = random.uniform(-200, 200)
-            initVy = random.uniform(-200, 200)
-            initTheta = random.uniform(-0.3, 0.3)  # Up to ~17 degrees off axis
+            initVx = random.uniform(0, 200)
+            initVy = random.uniform(0, 200)
+            initTheta = random.uniform(-0.2, 0.2)
 
             self.drone.state = np.array(
                 [initX, initY, initVx, initVy, initTheta, 0.0, 0.0, 0.0],
@@ -147,13 +168,11 @@ class Environment(gym.Env):
             self.currWaypointIdx = 0
 
         self.currStep = 0
-        target = self.waypoints[self.currWaypointIdx]
-        normState = self._normalizeState(self.drone.state, target)
+        self._waypointBonusGiven = False
+        normState = self._normalizeState(self.drone.state)
 
         # Reset turbulence timer
         self.time = 0.0
-        # Reset boundary hit flag
-        self.hitBoundary = False
         
         return normState, {}
 
@@ -166,9 +185,6 @@ class Environment(gym.Env):
         # Slowly blend current wind towards the target wind (5% per frame)
         self.windDirection += (self.targetWindDirection - self.windDirection) * 0.05
         self.windSpeed += (self.targetWindSpeed - self.windSpeed) * 0.05
-
-        if isinstance(action, np.ndarray):
-            action = Action(*action)
 
         # ------------------------- WIND CALCULATION ------------------------
         # Drift the global wind direction slowly over time
@@ -194,67 +210,90 @@ class Environment(gym.Env):
         # Combine base wind with gusts to get total wind force
         effWindX = self.windSpeed * math.cos(self.windDirection) + gustX
         effWindY = self.windSpeed * math.sin(self.windDirection) + gustY
-        effectiveWind = (effWindX, effWindY)
-        flogger.info(f"[WIND] Effective wind: {effectiveWind}")
+
+        # Store effective wind inside drone state
+        self.drone.state[6] = effWindX
+        self.drone.state[7] = effWindY
 
         # Calculate distance to current waypoint
-        prevX, prevY = self.drone.state[:2]
         targetX, targetY = self.waypoints[self.currWaypointIdx]
-        prevDistance = np.hypot(prevX - targetX, prevY - targetY)
+        prevDistance = np.hypot(X - targetX, Y - targetY)
 
         # -------------------------- DRONE PHYSICS STEP ------------------------
-        self.drone.step(action, wind=effectiveWind)
+        flogger.info(f"[STATE] Drone State (t: {self.currStep}): {self.drone.state}")
+        flogger.info(f"[STATE] Drone Action (t: {self.currStep}): {self.drone.action}")
+
+        self.drone.step(action)
 
         # ---------------------- WAYPOINT & REWARD LOGIC ----------------------
         x, y, vx, vy, theta, omega = self.drone.state[:6]
+
         outOfBounds = (
-            x < 0 or x > Screen.WIDTH or
-            y < 0 or y > Screen.HEIGHT
+            (x < 0 or x > Screen.WIDTH) or
+            (y < 0 or y > Screen.HEIGHT)
         )
         distance = np.hypot(x - targetX, y - targetY)
-        
+        speed = np.hypot(vx, vy)
+
+        terminated = (
+            abs(theta) > np.radians(75)
+            or speed > 1500.0
+            or outOfBounds
+        )
+
         # ------------------------ REWARD STRUCTURE ----------------------
         # Distance reward: Closer to the target is better
-        reward = (prevDistance - distance) * 0.1
+        if prevDistance > distance:
+            reward = (prevDistance - distance) * 0.8
+        elif prevDistance <= distance:
+            reward = (prevDistance - distance) * 1.5
+
+        # When close to the target, heavily penalize remaining speed.
+        if distance < 150.0:
+            fProximity = 1.0 - (distance / 150.0)
+            reward -= fProximity * speed * 0.05
 
         # Orientation reward: Encourage level flight (theta near 0)
-        reward -= abs(theta) * 0.02
-        reward -= abs(omega) * 0.05
+        reward -= abs(theta) * 0.08
+        reward -= abs(omega) * 0.2
 
         # Boundary penalty: Discourage hitting the walls
-        if self.hitBoundary:
-            reward -= 5.0
-            self.hitBoundary = False  # Reset for next step
+        if outOfBounds:
+            reward -= 50.0
 
         # Check if waypoint reached
         waypointReached = False
         if distance < self.waypointThresh:
-            # Bonus for reaching waypoint
-            reward += 20.0  
             waypointReached = True
-            # Move to next waypoint (cyclic)
-            self.currWaypointIdx = (self.currWaypointIdx + 1) % len(self.waypoints)
-            # Switch wind condition to new waypoint
-            self.targetWindDirection, self.targetWindSpeed = self.waypointWinds[self.currWaypointIdx]
+            # Provide bonus reward for the first waypoint hit
+            if not self._waypointBonusGiven:
+                reward += 2.0
+                self._waypointBonusGiven = True
+            
+            # Bonus reward for staying in the proximity
+            reward += 10.0
 
-        target = self.waypoints[self.currWaypointIdx]
-        flogger.info(f"[STATE] Position: ({x:.1f}, {y:.1f}) | Velocity: ({vx:.1f}, {vy:.1f}) | Distance to Target: {distance:.1f} | Reward: {reward:.2f} | Waypoint Reached: {waypointReached}")
-        normState = self._normalizeState(self.drone.state, target)
-        
-        speed = np.hypot(vx, vy)
-        terminated = (
-            abs(theta) > np.radians(75)
-            or speed > 900
-            or outOfBounds
-        )
+            if self.cycleWaypoints:
+                # Move to next waypoint (cyclic)
+                self.currWaypointIdx = (self.currWaypointIdx + 1) % len(self.waypoints)
+                # Switch wind condition to new waypoint
+                self.targetWindDirection, self.targetWindSpeed = self.waypointWinds[self.currWaypointIdx]
+
+        flogger.info(f"[STATE] Position: ({x:.1f}, {y:.1f}) | Velocity: ({vx:.1f}, {vy:.1f}) | Distance: {distance:.1f} | Wind: ({effWindX}, {effWindY})")
 
         # Heavy penalty for crashing
         if terminated:
             reward -= 15.0
 
-        isDone = self.currStep >= self.stepsMax
+        flogger.info(f"[REWARD] Reward: {reward:.2f} | Terminated: {terminated}")
 
-        flogger.info(f"[REWARD] Reward: {reward:.2f} | Terminated: {terminated} | Done: {isDone}\n")
+        isDone = self.currStep >= self.stepsMax
+        # If the episode is done, log the "status" of the episode
+        if isDone:
+            flogger.info(f" Step {self.currStep} ::: Successful? -> {isDone} ".center(100, chr(45)))
+
+        # Normalize state before taking an action step
+        normState = self._normalizeState(self.drone.state)
 
         return (
             normState,
@@ -266,53 +305,31 @@ class Environment(gym.Env):
 
     def getExpertAction(self) -> np.ndarray:
         if self.expert:
-            return self.expert.getAction(self.drone.state, Physics.DT).toNumpy()
+            return self.expert.getAction(
+                self.drone.state,
+                self.waypoints[self.currWaypointIdx],
+                Physics.DT
+            ).toNumpy()
         else:
             raise ValueError("Environment not initialized with an expert controller.")
-
-    def _enforceBoundaries(self):
-        """Keeps drone on screen and stops velocity on impact"""
-        x, y, vx, vy, theta, omega, _, _ = self.drone.state
-        margin = Screen.MARGIN
-
-        if y > Screen.HEIGHT - margin:
-            self.drone.state[1] = Screen.HEIGHT - margin
-            self.drone.state[3] = min(0, vy)
-            # Dampen the rotation on hard ground impact
-            self.drone.state[5] *= 0.5
-            self.hitBoundary = True
-
-        if y < margin:
-            self.drone.state[1] = margin
-            self.drone.state[3] = max(0, vy)
-            self.hitBoundary = True
-
-        if x < margin:
-            self.drone.state[0] = margin
-            self.drone.state[2] = max(0, vx)
-            self.hitBoundary = True
-
-        if x > Screen.WIDTH - margin:
-            self.drone.state[0] = Screen.WIDTH - margin
-            self.drone.state[2] = min(0, vx)
-            self.hitBoundary = True
 
     def runUserControl(self):
         isRunning: bool = True
 
         while isRunning:
             # At start, ~82% power on both (hover)
-            action = Action(0.82, 0.82)
+            action = Action(0.75, 0.75)
 
             if self.render:
                 for event in pygame.event.get():
                     if event.type == pygame.QUIT:
                         isRunning = False
 
-            # For expert control
+            # For "expert" control
             if self.expert:
                 action = self.getExpertAction()
 
+            # For "user" control
             else:
                 keys = pygame.key.get_pressed()
 
@@ -351,6 +368,36 @@ class Environment(gym.Env):
         if self.render:
             pygame.quit()
             os.system("clear")
+    # -------------------------------- RENDERING --------------------------------
+    def runExpertCollectorPipeline(self, numTrajec=2000):
+        """
+        Visualizes the exact process of the ExpertCollector to debug trajectory health.
+        """
+        from core.collector import ExpertCollector
+
+        collector = ExpertCollector(
+            numTrajec=numTrajec, 
+            stepsPerTrajec=1000,
+            waypointIdx=0
+        )
+        # Collect the data and render the process
+        collector.collect(environment=self)
+
+        if self.render:
+            pygame.quit()
+            os.system("clear")
+
+    def _drawCollectorHUD(self, accepted, rejected, attempts, target, reward, wpHit, step, maxStep, crashed):
+        """Draws real-time stats at the bottom of the screen during collection."""
+        texts = [
+            f"[COLLECTOR] Waypoint: {target} | Accepted: {accepted} / {target} | Rejected: {rejected} | Attempts: {attempts}",
+            f"Step: {step} / {maxStep} | Crashed?: {crashed} | Waypoint Hits: {wpHit} | Reward: {reward:.1f}",
+        ]
+        yStart = Screen.HEIGHT - 50
+        for i, text in enumerate(texts):
+            color = (Colors.WHITE.R, Colors.WHITE.G, Colors.WHITE.B)
+            surface = self.font.render(text, True, color)
+            self.screen.blit(surface, (10, yStart + i * 20))
 
     def _thrustToColor(self, thrust):
         """
@@ -390,7 +437,6 @@ class Environment(gym.Env):
         rThrust = self.drone.action.RIGHT
         return self._thrustToColor(lThrust), self._thrustToColor(rThrust)
 
-    # -------------------------------- RENDERING --------------------------------
     def _drawDroneBody(self, cx, cy, theta):
         """
         Draws the physical frame, rotors, and center of mass.
@@ -429,24 +475,28 @@ class Environment(gym.Env):
         x, y, vx, vy, theta, omega = self.drone.state[:6]
         cx, cy = int(x), int(y)
 
-        # Draw layers in correct order (Body first, Vector on top)
+        # ---------------- DRAW DRONE ----------------
         self._drawDroneBody(cx, cy, theta)
 
-        if self.expert:
-            targetX, targetY = self.expert.waypoints[self.expert.currWaypointIdx]
-            pygame.draw.circle(
-                self.screen,
-                (Colors.GREEN.R, Colors.GREEN.G, Colors.GREEN.B),
-                (int(targetX), int(targetY)),
-                6,
-            )
-            pygame.draw.line(
-                self.screen,
-                (Colors.GREEN.R, Colors.GREEN.G, Colors.GREEN.B),
-                (cx, cy),
-                (int(targetX), int(targetY)),
-                1,
-            )
+        # ---------------- DRAW CURRENT WAYPOINT ----------------
+        targetX, targetY = self.waypoints[self.currWaypointIdx]
+
+        # Current target waypoint
+        pygame.draw.circle(
+            self.screen,
+            (Colors.GREEN.R, Colors.GREEN.G, Colors.GREEN.B),
+            (int(targetX), int(targetY)),
+            8,
+        )
+
+        # Guidance line
+        pygame.draw.line(
+            self.screen,
+            (Colors.GREEN.R, Colors.GREEN.G, Colors.GREEN.B),
+            (cx, cy),
+            (int(targetX), int(targetY)),
+            1,
+        )
 
     def _drawHUD(self):
         x, y, vx, vy, theta, omega, windX, windY = self.drone.state
@@ -455,7 +505,7 @@ class Environment(gym.Env):
             f"Velocity ::: ({vx:.1f}, {vy:.1f})",
             f"Tilt ::: {math.degrees(theta):.1f} deg",
             f"Action ::: Left: {self.drone.action.LEFT:.2f} | Right: {self.drone.action.RIGHT:.2f}",
-            "",
+            f"Wind ::: X: {windX:.3f} | Y: {windY:.3f}"
         ]
         for i, text in enumerate(texts):
             surface = self.font.render(
@@ -465,20 +515,32 @@ class Environment(gym.Env):
 
         # -------------------------------- WIND VISUALIZATION --------------------------------
         # Calculate arrow properties
-        lenArrows = 50
+        windMagnitude = math.hypot(windX, windY)
+        lenArrows = max(windMagnitude / 2.0, 5.0)
         angle = math.atan2(windY, windX)
 
         # Arrow base (center of screen)
-        baseX, baseY = Screen.WIDTH // 2, Screen.HEIGHT // 2
+        baseX, baseY = Screen.WIDTH - 100, Screen.HEIGHT - 100
+        
+        # Draw circle to contain wind magnitiude visualization
+        circleRadius = max( int(lenArrows), 25.0)
+        if circleRadius > 0:
+            pygame.draw.circle(
+                self.screen,
+                (Colors.RED.R, Colors.RED.G, Colors.RED.B),
+                (baseX, baseY),
+                circleRadius,
+                1
+            )
 
         # Arrow tip (displaced from center)
         tipX = baseX + lenArrows * math.cos(angle)
-        tipY = baseY - lenArrows * math.sin(angle)
+        tipY = baseY + lenArrows * math.sin(angle)
 
         # Draw the arrow shaft
         pygame.draw.line(
             self.screen,
-            (Colors.GRAY.R, Colors.GRAY.G, Colors.GRAY.B),
+            (Colors.RED.R, Colors.RED.G, Colors.RED.B),
             (baseX, baseY),
             (tipX, tipY),
             3,
@@ -487,18 +549,23 @@ class Environment(gym.Env):
         # Draw arrowhead
         lAngle = angle + math.pi * 0.85
         rAngle = angle - math.pi * 0.85
-        lenHead = 10
+        lenHead = 5
 
         leftX = tipX + lenHead * math.cos(lAngle)
-        leftY = tipY - lenHead * math.sin(lAngle)
+        leftY = tipY + lenHead * math.sin(lAngle)
         rightX = tipX + lenHead * math.cos(rAngle)
-        rightY = tipY - lenHead * math.sin(rAngle)
+        rightY = tipY + lenHead * math.sin(rAngle)
 
         pygame.draw.polygon(
             self.screen,
-            (Colors.GRAY.R, Colors.GRAY.G, Colors.GRAY.B),
+            (Colors.RED.R, Colors.RED.G, Colors.RED.B),
             [(tipX, tipY), (leftX, leftY), (rightX, rightY)],
         )
+
+        lblWind = self.font.render("Active Wind", True, (Colors.RED.R, Colors.RED.G, Colors.RED.B))
+        labelRect = lblWind.get_rect(center=(baseX, baseY - circleRadius - 15))
+        self.screen.blit(lblWind, labelRect)
+
 
         self._visualizeThrust()
 
@@ -589,5 +656,6 @@ class Environment(gym.Env):
 
 
 if __name__ == "__main__":
-    env = Environment(useExpert=False)
-    env.runUserControl()
+    env = Environment(useExpert=True, render=False)
+    env.runExpertCollectorPipeline()
+    # env.runUserControl()
