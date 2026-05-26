@@ -29,7 +29,7 @@ def main():
         batchSize=params.BATCH_SIZE,
         epochs=params.EPOCHS,
         lr=params.LR,
-        valSplit=params.SPLITS.VALIDATION,
+        splits=params.SPLITS,
     )
 
     trainer.train(env)

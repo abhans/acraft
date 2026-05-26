@@ -10,16 +10,17 @@ from tqdm import tqdm
 from core.env import Environment
 from core.model.critic import Policy
 from core.model.dataset import ExpertDataset
+from core.model.params import Splits
 
 
 class BehaviorClone:
     def __init__(
         self,
+        splits: Splits,
         pathExpert: str,
         batchSize: int = 512,
         epochs: int = 50,
         lr: float = 3e-4,
-        valSplit: float = 0.1,
     ):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -33,7 +34,7 @@ class BehaviorClone:
         # Load the expert dataset
         dataset = ExpertDataset(pathExpert)
 
-        valSize = int(len(dataset) * valSplit)
+        valSize = int(len(dataset) * splits.VALIDATION)
         trainSize = len(dataset) - valSize
 
         trainDataset, valDataset = random_split(
