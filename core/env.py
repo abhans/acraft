@@ -42,7 +42,7 @@ class Environment(gym.Env):
         self.waypointThresh: float = 10.0  # In Pixels
         self.waypointWinds: dict = {}  # Store wind conditions per waypoint
         self._waypointBonusGiven: bool = False
-        self.cycleWaypoints: bool = True
+        self.cycleWaypoints: bool = False
 
         # -------- The Wind Effects --------
         self.windDirection: float = 0.0
@@ -57,18 +57,43 @@ class Environment(gym.Env):
         # TODO: These variables are not used anywhere! Likely that something is missing
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32)
         self.observation_space = spaces.Box(
-            low=-1.0, high=1.0, shape=(8,), dtype=np.float32
+            low=-1.0, high=1.0, shape=(10,), dtype=np.float32
         )
 
     def _normalizeState(self, state) -> np.ndarray:
         x, y, vx, vy, theta, omega, windFx, windFy = state
         
-        absX = (x - Screen.WIDTH / 2) / (Screen.WIDTH / 2)
-        absY = (y - Screen.HEIGHT / 2) / (Screen.HEIGHT / 2) 
+        # -------------------- Absolute Coordinates ---------------- 
+        normX = np.clip(
+            (x - Screen.WIDTH / 2) / (Screen.WIDTH / 2),
+            -1.0, 1.0
+        )
+        normY = np.clip(
+            (y - Screen.HEIGHT / 2) / (Screen.HEIGHT / 2),
+            -1.0, 1.0
+        )
 
-        normX = np.clip(absX, -1.0, 1.0)
-        normY = np.clip(absY, -1.0, 1.0)
+        # ------------ Relative Distance To Target ------------
+        targetX, targetY = self.waypoints[self.currWaypointIdx]
+        dx = targetX - x
+        dy = targetY - y
 
+        maxDistance = math.hypot(
+            Screen.WIDTH / 2,
+            Screen.HEIGHT / 2
+        )
+
+        normDx = np.clip(
+            dx / maxDistance,
+            -1.0, 1.0
+        )
+
+        normDy = np.clip(
+            dy / maxDistance,
+            -1.0, 1.0
+        )
+
+        # ---------------- Velocity ----------------
         normVx = np.clip(
             (vx / 1500.0),
             -1.0, 1.0
@@ -78,15 +103,19 @@ class Environment(gym.Env):
             -1.0, 1.0
         )
 
+        # --------------- Orientation ---------------
         normTheta = np.clip(
             (theta / math.pi),
             -1.0, 1.0
         )
+
+        # ------------- Angular Velocity -------------
         normOmega = np.clip(
             (omega / 10.0),
             -1.0, 1.0
         )
 
+        # --------------- Active Wind ----------------
         normWindFx = np.clip(
             (windFx / 25.0),
             -1.0, 1.0
@@ -106,6 +135,9 @@ class Environment(gym.Env):
                 normOmega,
                 normWindFx,
                 normWindFy,
+                # Relative Distance
+                normDx,
+                normDy
             ],
             dtype=np.float32,
         )
@@ -249,7 +281,7 @@ class Environment(gym.Env):
             reward = (prevDistance - distance) * 1.5
 
         # When close to the target, heavily penalize remaining speed.
-        if distance < 150.0:
+        if distance < 25.0:
             fProximity = 1.0 - (distance / 150.0)
             reward -= fProximity * speed * 0.05
 
@@ -271,7 +303,7 @@ class Environment(gym.Env):
                 self._waypointBonusGiven = True
             
             # Bonus reward for staying in the proximity
-            reward += 10.0
+            reward += 5.0
 
             if self.cycleWaypoints:
                 # Move to next waypoint (cyclic)
@@ -313,6 +345,25 @@ class Environment(gym.Env):
         else:
             raise ValueError("Environment not initialized with an expert controller.")
 
+    def runExpertCollectorPipeline(self, numTrajec=2000):
+        """
+        Visualizes the exact process of the ExpertCollector to debug trajectory health.
+        """
+        from core.collector import ExpertCollector
+
+        collector = ExpertCollector(
+            numTrajec=numTrajec, 
+            stepsPerTrajec=1000,
+            waypointIdx=0
+        )
+        # Collect the data and render the process
+        collector.collect(environment=self)
+
+        if self.render:
+            pygame.quit()
+            os.system("clear")
+
+    # -------------------------------- RENDERING --------------------------------
     def runUserControl(self):
         isRunning: bool = True
 
@@ -364,24 +415,6 @@ class Environment(gym.Env):
 
                 pygame.display.flip()
                 self.clock.tick(Physics.FPS)
-
-        if self.render:
-            pygame.quit()
-            os.system("clear")
-    # -------------------------------- RENDERING --------------------------------
-    def runExpertCollectorPipeline(self, numTrajec=2000):
-        """
-        Visualizes the exact process of the ExpertCollector to debug trajectory health.
-        """
-        from core.collector import ExpertCollector
-
-        collector = ExpertCollector(
-            numTrajec=numTrajec, 
-            stepsPerTrajec=1000,
-            waypointIdx=0
-        )
-        # Collect the data and render the process
-        collector.collect(environment=self)
 
         if self.render:
             pygame.quit()

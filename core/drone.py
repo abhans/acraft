@@ -13,6 +13,7 @@ This class simulates a 2D drone with realistic physics using pixel units.
 - vx, vy: Linear velocity (pixels/s)
 - theta: Orientation angle (radians)
 - omega: Angular velocity (radians/s)
+- Wind (wX, wY): Effective wind on both axis
 
 ------------ ACTIONS ------------
 - LEFT: Thrust level for the left rotor (0.0 to 1.0)
