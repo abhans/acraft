@@ -1,6 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch import nn
+from torch.utils.data import DataLoader
 
 from core.model.critic import Critic, Policy
 
@@ -9,7 +10,7 @@ class RolloutBuffer:
     def __init__(
         self,
         sBuffer: int,
-        dimState: int = 8,
+        dimState: int = 10,
         dimAction: int = 2,
         gamma: float = 0.99,
         lambdaGAE: float = 0.95,
@@ -57,7 +58,7 @@ class RolloutBuffer:
         if self.ptr == 0:
             raise RuntimeError("RolloutBuffer is empty.")
 
-        lastGAE = torch.tensor(0.0, device=self.device)
+        lastGAE = torch.as_tensor(0.0, device=self.device)
 
         values = values.detach()
         lastVal = lastVal.detach()
@@ -113,6 +114,9 @@ def updatePPO(
     clipEpsilon: float = 0.2,
     coeffValue: float = 0.5,
     coeffEntropy: float = 0.01,
+    # Behavior Clone Parameters
+    loader: DataLoader | None = None,
+    coeffBClone: float = .5
 ):
     """
     Performs the PPO update step.
@@ -128,7 +132,11 @@ def updatePPO(
     totalPolicyLoss = 0.0
     totalValueLoss = 0.0
     totalEntropy = 0.0
+    # Behavior Cloning Loss
+    totalBCloneLoss = 0.0
     numUpdates = 0
+
+    dExpert = iter(loader) if loader is not None else None
 
     # PPO Epochs
     for _ in range(epochs):
@@ -141,6 +149,7 @@ def updatePPO(
 
             # Data to be processed in minibatches
             mbIndices = indices[start:end]
+            
             mbStates = states[mbIndices]
             mbActions = actions[mbIndices]
             mbAdvantages = advantages[mbIndices]
@@ -165,13 +174,30 @@ def updatePPO(
             # Critic predicts the value of the state
             predVals = critic(mbStates)
 
-            # Standard Mean Squared Error between predicted value and actual returns
+            # Standard Mean Squared Error between
+            # predicted value and actual returns
             valueLoss = F.mse_loss(predVals, mbReturns)
 
             # ------------------- ENTROPY BONUS -------------------
             # This directly corresponds to the -λ * H(π)
             # We want to MAXIMIZE entropy, so we subtract it from the loss
             entropyMean = entropy.mean()
+
+            # ------------- EXPERT BEHAVIOR CLONE LOSS --------------
+            bCloneLoss = torch.as_tensor(0.0, device=states.device)
+
+            try:
+                expStates, expActions = next(dExpert)
+            
+            except StopIteration:
+                iterExpert = iter(dExpert)
+                expStates, expActions = next(iterExpert)
+
+            expStates = expStates.to(states.device)
+            expActions = expActions.to(states.device)
+
+            expLogProbs, _ = policy.evaluate(expStates, expActions)
+            bCloneLoss = -expLogProbs.mean()
 
             # ------------------- BACKPROPAGATION -------------------
             # Total PPO Loss
@@ -197,6 +223,7 @@ def updatePPO(
             totalPolicyLoss += policyLoss.item()
             totalValueLoss += valueLoss.item()
             totalEntropy += entropyMean.item()
+            totalBCloneLoss += bCloneLoss.item()
 
             # Increment the number of updates for averaging
             numUpdates += 1
@@ -206,4 +233,5 @@ def updatePPO(
         "policyLoss": totalPolicyLoss / numUpdates,
         "valueLoss": totalValueLoss / numUpdates,
         "entropy": totalEntropy / numUpdates,
+        "bcloneLoss": totalBCloneLoss / numUpdates
     }

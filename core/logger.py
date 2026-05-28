@@ -4,6 +4,7 @@ import os
 from logging import handlers
 from pathlib import Path
 
+fmtDEBUG: str = ">>> %(asctime)s | %(levelname)s: %(msg)s -> %(name)s @ %(filename)s: Ln %(lineno)d"
 
 class BaseLogger(logging.Logger):
     def __init__(self, name: str, level: int = logging.NOTSET):
@@ -16,8 +17,8 @@ class BaseLogger(logging.Logger):
         :type level: int
         """
         super().__init__(name, level)
-        self._formatter = logging.Formatter(     # >>> 14:54:23 | INFO: BaseLogger @ config.py: Ln 48
-            ">>> %(asctime)s | %(levelname)s: %(msg)s -> %(name)s @ %(filename)s: Ln %(lineno)d",
+        self._formatter = logging.Formatter(
+            "%(msg)s",
             datefmt="%H:%M:%S",
         )
         self._handler()

@@ -1,26 +1,13 @@
-import math
+import itertools
 from dataclasses import dataclass
 
 import numpy as np
 
+_XGRID: list[int] = [400, 600, 1000, 1100]
+_YGRID: list[int] = [400, 600, 650, 700]
+
 WAYPOINTS: list[tuple[int, ...]] = [
-    # -------- Boundary & Sweeping Turns --------
-    (1100, 200),    # Test boundary approach
-    (1000, 650),    # Test steep 45-degree dive
-    (400, 700),     # Test long lateral translation
-
-    # -------- Extreme Altitudes & Verticals --------
-    (100, 150),     # Test extreme boundary
-    (100, 650),     # Test pure vertical drop
-
-    # -------- Symmetry & Precision --------
-    (1000, 150),    # Test horizontal sweep across the top
-    (1000, 650),    # Test pure vertical drop
-
-    # -------- Center Precision & Hovering --------
-    (600, 200),     # Test deadzone and noise on Y-axis
-    (600, 600),     # Test pure vertical descent
-    (600, 400),
+    (X, Y) for X, Y in itertools.product(_XGRID, _YGRID)
 ]
 
 
@@ -36,11 +23,9 @@ class Wind:
     """
     Wind parameters simulating aerodynamic forces.
     """
-    MAX_WIND_DIR: float = math.pi   # Maximum wind direction in radians (360 degrees)
-    SPEED: float = 150.0            # Base wind speed (pixels/s^2)
+    SPEED: float = 50.0             # Base wind speed (pixels/s^2)
     DIRECTION: float = 0.0          # Wind angle in radians (0.0 = Right, pi/2 = Up, pi = Left)
-    TURBULENCE: float = 0.1         # How rapidly the wind changes speed and direction over time
-    GUST_STRENGTH: float = 8.0      # Maximum gust strength added to the base wind (pixels/s^2)
+    GUST_STRENGTH: float = 20.0     # Maximum gust strength added to the base wind (pixels/s^2)
     DRIFT_SPEED: float = 0.005      # Drift speed for slow, constant wind changes (pixels/s^2)
     DRIFT_DIR_SPEED: float = 0.003  # How quickly the drift direction changes (radians/s)
 
@@ -54,24 +39,12 @@ class Physics:
     """
     GRAVITY: float = 880.0              # Effective Gravity  (pixels/s^2)
     MASS: float = 1.0                   # Mass of the drone (kg)
-    INERTIA: float = 20.0               # Moment of inertia for rotation (kg*pixels^2)
-    MAX_THRUST: float = 600.0           # Max force per rotor (pixels/s^2)
-    MAX_TILT: float = np.radians(40)    # Max tilt angle (radians)
+    INERTIA: float = 25.0               # Moment of inertia for rotation (kg*pixels^2)
+    MAX_THRUST: float = 990.0           # Max force per rotor (pixels/s^2)
     ARM_LENGTH: int = 30                # Visual length of drone arm (pixels)
     ROTOR_RADIUS: int = 8               # Visual size of rotors
     FPS: float = 60.0
     DT: float = 1.0 / FPS
-
-
-@dataclass
-class Thrust:
-    """
-    Thrust values for hover and movement.
-    HOVER is the thrust needed to counteract gravity and maintain altitude.
-    MOVE is the additional thrust applied when the player gives input.
-    """
-    HOVER: float = Physics.GRAVITY
-    MOVE: float = 100.0
 
 
 @dataclass
@@ -80,8 +53,8 @@ class Drag:
     Drag coefficients for linear and angular movement.
     These values help stabilize the drone and prevent perpetual motion.
     """
-    LINEAR: float = 0.75
-    ANGULAR: float = 0.77
+    LINEAR: float = 0.5
+    ANGULAR: float = 0.65
 
 
 @dataclass
