@@ -5,7 +5,7 @@ from torch import distributions
 
 
 class Critic(nn.Module):
-    def __init__(self, dimState=8, dimHidden=256):
+    def __init__(self, dimState=10, dimHidden=256):
         super(Critic, self).__init__()
 
         self.net = nn.Sequential(
@@ -49,7 +49,7 @@ class Critic(nn.Module):
 
 
 class Policy(nn.Module):
-    def __init__(self, dimState=8, dimAction=2, dimHidden=256):
+    def __init__(self, dimState=10, dimAction=2, dimHidden=256):
         super(Policy, self).__init__()
 
         # Shared feature extractor

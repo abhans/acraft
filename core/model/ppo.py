@@ -10,7 +10,7 @@ class RolloutBuffer:
     def __init__(
         self,
         sBuffer: int,
-        dimState: int = 8,
+        dimState: int = 10,
         dimAction: int = 2,
         gamma: float = 0.99,
         lambdaGAE: float = 0.95,

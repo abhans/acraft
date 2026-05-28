@@ -59,7 +59,7 @@ class BehaviorClone:
 
         # --------------------------- Addition of Policy ---------------------------
         self.policy = Policy(
-            dimState=8,
+            dimState=10,
             dimAction=2
         ).to(self.device)
 
@@ -98,7 +98,7 @@ class BehaviorClone:
                 predActions, _ = self.policy.forward(states)
 
                 # Compute MSE loss between predicted and expert actions
-                loss = F.mse_loss(
+                loss = F.huber_loss(
                     predActions,
                     expertActions
                 )
