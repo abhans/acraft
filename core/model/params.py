@@ -23,7 +23,7 @@ class Paths:
         self.TEST = self._TESTS / testID
 
     def createTest(self):
-        self.TEST = self._TESTS / self.getCurrentTest()
+        self.TEST = self._TESTS / self.initiateTest()
 
     def ensure(self, weights, metrics):
         """
@@ -35,7 +35,7 @@ class Paths:
 
     def getCurrentTest(self) -> str:
         """
-        Returns the next available test ID.
+        Returns the latest available test ID.
         """
         self._TESTS.mkdir(parents=True, exist_ok=True)
 
@@ -48,6 +48,22 @@ class Paths:
         currTestID = max(testIDs)
 
         return f"{currTestID:02d}"
+    
+    def initiateTest(self):
+        """
+        Returns the "next" available test ID.
+        """
+        self._TESTS.mkdir(parents=True, exist_ok=True)
+
+        testIDs = []
+        initTest: int = 1
+
+        for item in os.listdir(self._TESTS):
+            if item.isdigit():
+                testIDs.append(int(item))
+                initTest += 1
+        
+        return f"{initTest:02d}"
 
 
 @dataclass
