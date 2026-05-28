@@ -32,7 +32,7 @@ class ExpertCollector:
         self.qualityThresholds = {
             "maxTheta": np.radians(30),  # Max tilt angle in radians
             "maxOmega": 15.0,            # Max angular velocity in radians/s
-            "minReward": 0.0,            # Minimum cumulative reward for a trajectory to be considered valid
+            "minReward": 50.0,            # Minimum cumulative reward for a trajectory to be considered valid
             "minWaypointHit": 1,         # Minimum number of waypoints that must be reached in a trajectory
         }
 
@@ -56,9 +56,13 @@ class ExpertCollector:
 
     def collect(self, environment):
         if environment is None:
-            environment = Environment(useExpert=True, render=False, stepsMax=self.stepsPerTrajec)
+            environment = Environment(
+                useExpert=True,
+                render=False,
+                stepsMax=self.stepsPerTrajec
+            )
 
-        # TODO: PPO training for a single target
+        # * PPO training for a single target
         environment.cycleWaypoints = False
         targetCoords: tuple[int, int] = environment.waypoints[self.targetWaypointIdx]
         
@@ -70,7 +74,7 @@ class ExpertCollector:
         self.maxAttempts = self.numTrajec * 20
 
         # Wrap the range() in tqdm for a beautiful progress bar
-        with tqdm(range(self.numTrajec), desc=f"[DATA] Collecting Trajectories for {targetCoords}", unit=" traj", ncols=100) as pbar: 
+        with tqdm(range(self.numTrajec), desc=f"[DATA] Collecting Trajectories for X:{targetCoords[0]} | Y:{targetCoords[1]}  ", unit=" traj", ncols=150) as pbar: 
             # Current Target
             while accepted < self.numTrajec and totalAttempts < self.maxAttempts:
                 # Update the number of totalAttempts for trajectory
@@ -126,7 +130,7 @@ class ExpertCollector:
                     # Transition : [state (8), action (2)]
                     transition = np.concatenate([currState.astype(np.float32), actionRaw])
                     dataTrajec.append(transition)
-
+                    
                     # ------------------- UI RENDERING -------------------
                     if environment.render:
                         environment.screen.fill((Colors.BLACK.R, Colors.BLACK.G, Colors.BLACK.B))
