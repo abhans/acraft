@@ -30,7 +30,7 @@ ckpt = torch.load(
 
 
 policy: Policy = Policy(
-    dimState=8,
+    dimState=10,
     dimAction=2
 ).to(DEVICE)
 

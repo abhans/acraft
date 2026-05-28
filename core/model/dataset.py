@@ -18,7 +18,7 @@ class ExpertDataset(Dataset):
         return len(self.transitions)
 
     def __getitem__(self, idx):
-        # * Dx and Dy is to be calculated.
+        # * Dx and Dy is to be calculated in the process.
         stateRaw = self.transitions[idx, :8]  # [X, Y, Vx, Vy, Theta, Omega, windFx, windFy]
         action = self.transitions[idx, 8:]    # [Tleft, Tright]
         x, y, vx, vy, theta, omega, windFx, windFy = stateRaw

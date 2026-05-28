@@ -19,8 +19,10 @@ from core.model.ppo import RolloutBuffer, updatePPO
 def main():
     # -------------------- Load Params --------------------
     paths = Paths()
+    # * For a single PPO run
     testID: str = paths.getCurrentTest()
     paths.setTest(testID)
+    print(f"[SYSTEM::PPO] Training for Test {testID}")
     params: dict[str, PPO | BClone] = {
         "ppo": PPO(paths),
         "bclone": BClone(paths)
@@ -34,7 +36,7 @@ def main():
     # -------------------- Initialize Environment --------------------
     # * Change the "render" to speed up training (disables visualization)
     env = Environment(
-        useExpert=False,
+        useExpert=False,    
         render=False,
         stepsMax=1000
     )
@@ -42,8 +44,8 @@ def main():
     env.cycleWaypoints = False
 
     # -------------------- Initialize Networks --------------------
-    policy = Policy(dimState=8, dimAction=2).to(DEVICE)
-    critic = Critic(dimState=8).to(DEVICE)
+    policy = Policy(dimState=10, dimAction=2).to(DEVICE)
+    critic = Critic(dimState=10).to(DEVICE)
 
     # ----------- Load Pre-Trained Behavior Clone Weights -----------
     if params["bclone"].WEIGHTS.exists():
@@ -59,7 +61,7 @@ def main():
     # -------------------- Initialize Rollout Buffer --------------------
     buffer = RolloutBuffer(
         sBuffer=params["ppo"].BUFFER_SIZE,
-        dimState=8,
+        dimState=10,
         dimAction=2,
         gamma=params["ppo"].GAMMA,
         lambdaGAE=params["ppo"].LAMBDA_GAE,
@@ -74,7 +76,7 @@ def main():
         range(params["ppo"].ITERATIONS),
         desc="[PPO] Training Progress",
         ascii=False,
-        ncols=200
+        ncols=150
     )
 
     metrics: list[str, ...] = []
@@ -85,7 +87,7 @@ def main():
 
         # --- 01: ROLLOUT ---
         state, _ = env.reset(options={"randomStart": True}, seed=None)
-        stateTensor = torch.as_tensor(state, dtype=torch.float32, device=DEVICE)
+        stateTensor: torch.Tensor = torch.as_tensor(state, dtype=torch.float32, device=DEVICE)
         
         winReward: int = 20
         currEpisodeReward: float = 0.0
