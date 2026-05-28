@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-_XGRID: list[int] = [100, 400, 600, 1000, 1100]
-_YGRID: list[int] = [150, 200, 400, 600, 650, 700]
+_XGRID: list[int] = [400, 600, 1000, 1100]
+_YGRID: list[int] = [400, 600, 650, 700]
 
 WAYPOINTS: list[tuple[int, ...]] = [
     (X, Y) for X, Y in itertools.product(_XGRID, _YGRID)
@@ -40,7 +40,7 @@ class Physics:
     GRAVITY: float = 880.0              # Effective Gravity  (pixels/s^2)
     MASS: float = 1.0                   # Mass of the drone (kg)
     INERTIA: float = 25.0               # Moment of inertia for rotation (kg*pixels^2)
-    MAX_THRUST: float = 880.0           # Max force per rotor (pixels/s^2)
+    MAX_THRUST: float = 990.0           # Max force per rotor (pixels/s^2)
     ARM_LENGTH: int = 30                # Visual length of drone arm (pixels)
     ROTOR_RADIUS: int = 8               # Visual size of rotors
     FPS: float = 60.0
