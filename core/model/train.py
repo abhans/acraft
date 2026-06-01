@@ -1,5 +1,5 @@
 """
-This module contains the training script for the 'Behavior Clone' model. 
+This file contains the training script for the 'Behavior Clone' model. 
 
 It initializes the training process, trains the model, and saves the trained policy to disk.
 """
@@ -13,6 +13,7 @@ def main():
     paths: Paths = Paths()
     # Create a new test directory to save the results
     paths.createTest()
+    testID: str = paths.getCurrentTest()
 
     env = Environment(
         useExpert=False,
@@ -25,6 +26,7 @@ def main():
     paths.ensure(params.WEIGHTS, params.METRICS)
 
     trainer = BehaviorClone(
+        test=testID,
         pathExpert=str(paths.EXPERT),
         batchSize=params.BATCH_SIZE,
         epochs=params.EPOCHS,

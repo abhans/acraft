@@ -1,3 +1,5 @@
+import itertools
+
 import torch
 import torch.nn.functional as F
 from torch import nn
@@ -106,12 +108,12 @@ class RolloutBuffer:
 def updatePPO(
     policy: Policy,
     critic: Critic,
-    optimizerPolicy: torch.optim.Optimizer,
-    optimizerCritic: torch.optim.Optimizer,
+    optPolicy: torch.optim.Optimizer,
+    optCritic: torch.optim.Optimizer,
     bufferData: tuple,
     epochs: int = 4,
     sMinibatch: int = 64,
-    clipEpsilon: float = 0.2,
+    clipEps: float = 0.2,
     coeffValue: float = 0.5,
     coeffEntropy: float = 0.01,
     # Behavior Clone Parameters
@@ -136,7 +138,7 @@ def updatePPO(
     totalBCloneLoss = 0.0
     numUpdates = 0
 
-    dExpert = iter(loader) if loader is not None else None
+    dExpert = itertools.cycle(loader) if loader is not None else None
 
     # PPO Epochs
     for _ in range(epochs):
@@ -165,7 +167,7 @@ def updatePPO(
 
             # PPO Clipped Surrogate Objective
             surrogate1 = ratio * mbAdvantages
-            surrogate2 = torch.clamp(ratio, 1.0 - clipEpsilon, 1.0 + clipEpsilon) * mbAdvantages
+            surrogate2 = torch.clamp(ratio, 1.0 - clipEps, 1.0 + clipEps) * mbAdvantages
 
             # We want to MAXIMIZE this, so we take the min and add a negative sign for the optimizer
             policyLoss = -torch.min(surrogate1, surrogate2).mean()
@@ -186,12 +188,10 @@ def updatePPO(
             # ------------- EXPERT BEHAVIOR CLONE LOSS --------------
             bCloneLoss = torch.as_tensor(0.0, device=states.device)
 
-            try:
-                expStates, expActions = next(dExpert)
-            
-            except StopIteration:
-                iterExpert = iter(dExpert)
-                expStates, expActions = next(iterExpert)
+            expStates, expActions = next(dExpert)
+        
+            iterExpert = iter(dExpert)
+            expStates, expActions = next(iterExpert)
 
             expStates = expStates.to(states.device)
             expActions = expActions.to(states.device)
@@ -207,8 +207,8 @@ def updatePPO(
                 - coeffEntropy * entropyMean
             )
 
-            optimizerPolicy.zero_grad()
-            optimizerCritic.zero_grad()
+            optPolicy.zero_grad()
+            optCritic.zero_grad()
 
             loss.backward()
 
@@ -216,8 +216,8 @@ def updatePPO(
             nn.utils.clip_grad_norm_(policy.parameters(), max_norm=0.5)
             nn.utils.clip_grad_norm_(critic.parameters(), max_norm=0.5)
 
-            optimizerPolicy.step()
-            optimizerCritic.step()
+            optPolicy.step()
+            optCritic.step()
 
             # Save the total losses and entropy
             totalPolicyLoss += policyLoss.item()

@@ -10,17 +10,19 @@ from tqdm import tqdm
 from core.env import Environment
 from core.model.critic import Policy
 from core.model.dataset import ExpertDataset
-from core.model.params import Splits
+from core.model.params import PPO, BClone, Paths, Splits
 
 
 class BehaviorClone:
     def __init__(
         self,
+        test: str,
         splits: Splits,
         pathExpert: str,
         batchSize: int = 512,
         epochs: int = 50,
         lr: float = 3e-4,
+        
     ):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -29,17 +31,23 @@ class BehaviorClone:
         self.batchSize = batchSize
         self.epochs = epochs
         # Metrics for tracking training progress
+        paths: Paths = Paths()
+        paths.setTest(test)
+        self.params: dict[str, PPO | BClone] = {
+            "ppo": PPO(paths),
+            "bclone": BClone(paths)
+        }
         self.metrics: list[dict] = []
         # -------------------- Dataset Configuration & Loaders --------------------
         # Load the expert dataset
         dataset = ExpertDataset(pathExpert)
 
-        valSize = int(len(dataset) * splits.VALIDATION)
-        trainSize = len(dataset) - valSize
+        sValidation = int(len(dataset) * splits.VALIDATION)
+        sTrain = len(dataset) - sValidation
 
         trainDataset, valDataset = random_split(
             dataset,
-            [trainSize, valSize]
+            [sTrain, sValidation]
         )
 
         # Data Loaders
@@ -60,7 +68,8 @@ class BehaviorClone:
         # --------------------------- Addition of Policy ---------------------------
         self.policy = Policy(
             dimState=10,
-            dimAction=2
+            dimAction=2,
+            dimHidden=self.params["bclone"].HIDDEN_DIMS
         ).to(self.device)
 
         self.optimizer = optim.Adam(
@@ -176,7 +185,7 @@ class BehaviorClone:
             desc="[BCLONE] Training",
             unit="epoch",
             ascii=False,
-            ncols=200
+            ncols=150
         )
 
         # Iterate over epochs
