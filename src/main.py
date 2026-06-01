@@ -31,7 +31,9 @@ ckpt = torch.load(
 
 policy: Policy = Policy(
     dimState=10,
-    dimAction=2
+    dimAction=2,
+    # * Change according to the saved policy dimensions
+    dimHidden=params.HIDDEN_DIMS
 ).to(DEVICE)
 
 policy.load_state_dict(ckpt["policy"])

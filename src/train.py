@@ -40,12 +40,13 @@ def main():
         render=False,
         stepsMax=1000
     )
-    # TODO: PPO training for a single target
+    # * PPO training for a single target waypoint
     env.cycleWaypoints = False
 
     # -------------------- Initialize Networks --------------------
-    policy = Policy(dimState=10, dimAction=2).to(DEVICE)
-    critic = Critic(dimState=10).to(DEVICE)
+    # TODO: Experiment on different values for hidden dimensions
+    policy = Policy(dimState=10, dimAction=2, dimHidden=params["ppo"].HIDDEN_DIMS).to(DEVICE)
+    critic = Critic(dimState=10, dimHidden=params["ppo"].HIDDEN_DIMS).to(DEVICE)
 
     # ----------- Load Pre-Trained Behavior Clone Weights -----------
     if params["bclone"].WEIGHTS.exists():
@@ -89,14 +90,13 @@ def main():
         state, _ = env.reset(options={"randomStart": True}, seed=None)
         stateTensor: torch.Tensor = torch.as_tensor(state, dtype=torch.float32, device=DEVICE)
         
-        winReward: int = 20
         currEpisodeReward: float = 0.0
         episodeRewards: list[float] = []
         done: bool = False
 
         for step in range(params["ppo"].BUFFER_SIZE):
             with torch.no_grad():
-                actionTensor, logProb = policy(stateTensor)
+                actionTensor, logProb = policy.forward(stateTensor)
 
             npAction = actionTensor.squeeze(0).cpu().numpy()
             nextState, reward, terminated, truncated, info = env.step(npAction)
@@ -174,12 +174,12 @@ def main():
         ppoStats = updatePPO(
             policy=policy,
             critic=critic,
-            optimizerPolicy=optimizerPolicy,
-            optimizerCritic=optimizerCritic,
+            optPolicy=optimizerPolicy,
+            optCritic=optimizerCritic,
             bufferData=bufferData,
             epochs=params["ppo"].EPOCHS,
             sMinibatch=params["ppo"].BATCH_SIZE,
-            clipEpsilon=params["ppo"].CLIP_EPSILON,
+            clipEps=params["ppo"].CLIP_EPSILON,
             coeffValue=params["ppo"].COEFF_VALUE,
             coeffEntropy=params["ppo"].COEFF_ENTROPY,
             loader=eLoader,
@@ -192,21 +192,14 @@ def main():
             predValues = critic(buffer.states[: buffer.ptr])
 
         returns = buffer.returns[: buffer.ptr]
-        varExplained = 1 - torch.var(returns - predValues, unbiased=False) / (torch.var(returns, unbiased=False) + 1e-8)
-
 
         # --- 04: LOGGING THE METRICS ---
+        varExplained = 1 - torch.var(returns - predValues, unbiased=False) / (torch.var(returns, unbiased=False) + 1e-8)
+
         avgReward = (
             sum(episodeRewards) / len(episodeRewards)
             if episodeRewards
             else currEpisodeReward
-        )
-
-        recentRewards = episodeRewards[-winReward:]
-        movingAvgReward = (
-            sum(recentRewards) / len(recentRewards)
-            if recentRewards
-            else avgReward
         )
 
         pbar.set_postfix(
@@ -224,7 +217,6 @@ def main():
             "Loss:Value": ppoStats["valueLoss"],
             "Entropy": ppoStats["entropy"],
             "Explained Variance": varExplained.item(),
-            "Moving Average Reward": movingAvgReward,
             "Buffer Size": buffer.ptr,
         })
 
