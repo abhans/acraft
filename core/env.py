@@ -149,8 +149,9 @@ class Environment(gym.Env):
         # Generate random wind conditions for each waypoint
         self.waypointWinds = {}
         for i in range(len(self.waypoints)):
-            direction = Wind.DIRECTION + random.uniform(-math.pi, math.pi)
-            speed = Wind.SPEED + random.uniform(-100, 100)
+            # TODO: Experiment with different wind conditions
+            direction = Wind.DIRECTION + random.uniform(-math.pi / 4, math.pi / 4)
+            speed = Wind.SPEED + random.uniform(-50, 50)
             self.waypointWinds[i] = (direction, speed)
 
         flogger.info(f"[WIND] Waypoint Winds: {self.waypointWinds}")
@@ -582,7 +583,7 @@ class Environment(gym.Env):
         # Draw arrowhead
         lAngle = angle + math.pi * 0.85
         rAngle = angle - math.pi * 0.85
-        lenHead = 5
+        lenHead = 10
 
         leftX = tipX + lenHead * math.cos(lAngle)
         leftY = tipY + lenHead * math.sin(lAngle)

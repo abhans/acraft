@@ -37,12 +37,12 @@ class Physics:
     We use pixels instead of meters to decouple visual rendering from strict SI units,
     making the simulation stable and intuitive for RL.
     """
-    GRAVITY: float = 880.0              # Effective Gravity  (pixels/s^2)
-    MASS: float = 1.0                   # Mass of the drone (kg)
-    INERTIA: float = 25.0               # Moment of inertia for rotation (kg*pixels^2)
-    MAX_THRUST: float = 990.0           # Max force per rotor (pixels/s^2)
-    ARM_LENGTH: int = 30                # Visual length of drone arm (pixels)
-    ROTOR_RADIUS: int = 8               # Visual size of rotors
+    GRAVITY: float = 880.0          # Effective Gravity  (pixels/s^2)
+    MASS: float = 1.0               # Mass of the drone (kg)
+    INERTIA: float = 25.0           # Moment of inertia for rotation (kg*pixels^2)
+    MAX_THRUST: float = 990.0       # Max force per rotor (pixels/s^2)
+    ARM_LENGTH: int = 30            # Visual length of drone arm (pixels)
+    ROTOR_RADIUS: int = 8           # Visual size of rotors
     FPS: float = 60.0
     DT: float = 1.0 / FPS
 
@@ -92,11 +92,11 @@ class Colors:
     Predefined colors for rendering the drone and environment.
     Used to visually indicate different states (e.g., thrust levels).
     """
-    BLACK = Color(0, 0, 0)
+    BLACK = Color(40, 40, 40)
     WHITE = Color(255, 255, 255)
-    RED = Color(255, 50, 50)
-    BLUE = Color(50, 50, 255)
+    RED = Color(252, 73, 52)
+    BLUE = Color(131, 165, 152)
     GRAY = Color(100, 100, 100)
-    GREEN = Color(50, 255, 50)
+    GREEN = Color(184, 187, 38)
     ORANGE = Color(255, 165, 0)
-    YELLOW = Color(255, 255, 50)
+    YELLOW = Color(250, 189, 47)

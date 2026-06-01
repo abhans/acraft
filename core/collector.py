@@ -80,6 +80,7 @@ class ExpertCollector:
                 # Update the number of totalAttempts for trajectory
                 totalAttempts += 1
 
+                # TODO: Test the effects of random start
                 environment.reset(options={"randomStart": True})
                 # Randomize expert behavior for this trajectory
                 environment.expert.randomize()
