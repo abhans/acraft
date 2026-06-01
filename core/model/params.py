@@ -100,9 +100,10 @@ class BClone:
         self.METRICS = self.MODEL / "metrics.csv"   # Path to save training metrics
         self.WEIGHTS = self.MODEL / "bclone.pth"    # Path to save trained policy weights
         # --- Training ---
+        self.HIDDEN_DIMS: int = 128                 # Hidden dimensions for both Policy and Critic
         self.BATCH_SIZE: int = 512                  # Batch size for training
         self.EPOCHS: int = 50                       # Number of epochs to train
-        self.LR: float = 1e-5                       # Learning rate for the optimizer
+        self.LR: float = 2.5e-6                     # Learning rate for the optimizer
         # Dataset splits
         self.SPLITS: Splits = Splits()
 
@@ -130,13 +131,14 @@ class PPO:
         self.METRICS = self.MODEL / "metrics.csv"   # Path to save training metrics
         self.WEIGHTS = self.MODEL / "ppo.pth"       # Path to save trained policy weights
         # --- Optimizers ---
-        self.LR: float = 2e-4                       # Learning rate for both Policy and Critic
+        self.LR: float = 1e-4                       # Learning rate for both Policy and Critic
         # --- Environment & Buffer ---
-        self.BUFFER_SIZE: int = 4096                # Steps collected per iteration
+        self.HIDDEN_DIMS: int = 128                 # Hidden dimensions for both Policy and Critic
+        self.BUFFER_SIZE: int = 8192                # Steps collected per iteration
         self.GAMMA: float = 0.99                    # Discount factor for future rewards
         self.LAMBDA_GAE: float = 0.95               # GAE smoothing parameter
         # --- PPO Specifics ---
-        self.EPOCHS: int = 4                        # Times to loop over the buffer per update
+        self.EPOCHS: int = 5                        # Times to loop over the buffer per update
         self.BATCH_SIZE: int = 512                  # Minibatch size for PPO
         self.CLIP_EPSILON: float = 0.1              # PPO clipping parameter (epsilon)
         self.COEFF_VALUE: float = 1.0               # Weight for the Critic's MSE loss

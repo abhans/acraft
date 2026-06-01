@@ -92,7 +92,7 @@ class Colors:
     Predefined colors for rendering the drone and environment.
     Used to visually indicate different states (e.g., thrust levels).
     """
-    BLACK = Color(40, 40, 40)
+    BLACK = Color(29, 32, 33)
     WHITE = Color(255, 255, 255)
     RED = Color(252, 73, 52)
     BLUE = Color(131, 165, 152)
