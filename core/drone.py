@@ -77,8 +77,7 @@ class Drone:
         if isinstance(action, Action):
             return action
 
-        # If the action is a 2D NumPy array (from PyTorch),
-        # convert it to Action dataclass
+        # If the action is a 2D NumPy array, convert it to Action dataclass
         elif isinstance(action, np.ndarray) and action.shape == (2,):
             lThrust, rThrust = action
             return Action(lThrust, rThrust)

@@ -54,7 +54,6 @@ class Environment(gym.Env):
         self.time: float = 0.0
 
         # Actions and Spaces
-        # TODO: These variables are not used anywhere! Likely that something is missing
         self.action_space = spaces.Box(low=0.0, high=1.0, shape=(2,), dtype=np.float32)
         self.observation_space = spaces.Box(
             low=-1.0, high=1.0, shape=(10,), dtype=np.float32
@@ -346,7 +345,7 @@ class Environment(gym.Env):
         else:
             raise ValueError("Environment not initialized with an expert controller.")
 
-    def runExpertCollectorPipeline(self, numTrajec=2000):
+    def runExpertCollectorPipeline(self, numTrajec=4000):
         """
         Visualizes the exact process of the ExpertCollector to debug trajectory health.
         """
