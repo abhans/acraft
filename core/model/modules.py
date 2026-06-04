@@ -40,7 +40,6 @@ class Critic(nn.Module):
                 if module.bias is not None:
                     nn.init.constant_(module.bias, 0.0)
 
-        # Final layer for value output usually has a gain of 1
         nn.init.orthogonal_(self.net[-1].weight, gain=1.0)
 
     def forward(self, state):
@@ -48,9 +47,9 @@ class Critic(nn.Module):
         return self.net(state).squeeze(-1)
 
 
-class Policy(nn.Module):
+class Actor(nn.Module):
     def __init__(self, dimState=10, dimAction=2, dimHidden=256):
-        super(Policy, self).__init__()
+        super(Actor, self).__init__()
 
         # Shared feature extractor
         self.nnFeature = nn.Sequential(
@@ -98,7 +97,8 @@ class Policy(nn.Module):
         :return: Tuple of (action, log probability) where:
 
             - action: Tensor of shape ``(sBatch, dimAction)`` with values in ``[0, 1]``
-            - log probability: Tensor of shape ``(sBatch,)`` representing the log probability of the sampled action under the policy
+            - log probability: Tensor of shape ``(sBatch,)`` representing the 
+                log probability of the sampled action under the policy
         """
         features = self.nnFeature(state)
         mean = self.nnMean(features)
@@ -132,8 +132,10 @@ class Policy(nn.Module):
         :param eps: Small constant for numerical stability in log calculations
         :return: Tuple of (log probabilities, entropies) where:
 
-            - log probabilities: Tensor of shape ``(sBatch,)`` representing the log probability of the given actions under the current policy
-            - entropies: Tensor of shape ``(sBatch,)`` representing the entropy of the policy's action distribution for each state
+            - log probabilities: Tensor of shape ``(sBatch,)`` representing the log probability of the given actions 
+                under the current policy
+            - entropies: Tensor of shape ``(sBatch,)`` representing the entropy of the policy's 
+                action distribution for each state
         """
         features = self.nnFeature(states)
         mean = self.nnMean(features)

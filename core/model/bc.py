@@ -8,8 +8,8 @@ from torch.utils.data import random_split
 from tqdm import tqdm
 
 from core.env import Environment
-from core.model.critic import Policy
 from core.model.dataset import ExpertDataset
+from core.model.modules import Actor
 from core.model.params import PPO, BClone, Paths, Splits
 
 
@@ -65,8 +65,8 @@ class BehaviorClone:
             drop_last=False,
         )
 
-        # --------------------------- Addition of Policy ---------------------------
-        self.policy = Policy(
+        # --------------------------- Addition of Actor ---------------------------
+        self.policy = Actor(
             dimState=10,
             dimAction=2,
             dimHidden=self.params["bclone"].HIDDEN_DIMS

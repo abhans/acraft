@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch import nn
 from torch.utils.data import DataLoader
 
-from core.model.critic import Critic, Policy
+from core.model.modules import Actor, Critic
 
 
 class RolloutBuffer:
@@ -106,7 +106,7 @@ class RolloutBuffer:
 
 
 def updatePPO(
-    policy: Policy,
+    policy: Actor,
     critic: Critic,
     optPolicy: torch.optim.Optimizer,
     optCritic: torch.optim.Optimizer,
@@ -162,14 +162,14 @@ def updatePPO(
             # Evaluate new log probs and entropy based on current policy weights
             newProbs, entropy = policy.evaluate(mbStates, mbActions)
 
-            # Calculate the ratio: exp(log_pi_new - log_pi_old)
+            # Calculate the ratio: exp(new - old)
             ratio = torch.exp(newProbs - mbOldProbs)
 
             # PPO Clipped Surrogate Objective
             surrogate1 = ratio * mbAdvantages
             surrogate2 = torch.clamp(ratio, 1.0 - clipEps, 1.0 + clipEps) * mbAdvantages
 
-            # We want to MAXIMIZE this, so we take the min and add a negative sign for the optimizer
+            # To maximize the surrogate objective, minimize the negative of the objective
             policyLoss = -torch.min(surrogate1, surrogate2).mean()
 
             # ------------------- VALUE GRADIENT -------------------
@@ -182,7 +182,6 @@ def updatePPO(
 
             # ------------------- ENTROPY BONUS -------------------
             # This directly corresponds to the -λ * H(π)
-            # We want to MAXIMIZE entropy, so we subtract it from the loss
             entropyMean = entropy.mean()
 
             # ------------- EXPERT BEHAVIOR CLONE LOSS --------------
@@ -205,6 +204,7 @@ def updatePPO(
                 policyLoss
                 + coeffValue * valueLoss
                 - coeffEntropy * entropyMean
+                + coeffBClone * bCloneLoss
             )
 
             optPolicy.zero_grad()

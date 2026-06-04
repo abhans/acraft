@@ -5,7 +5,7 @@ import torch
 
 from core.config import Colors, Physics, Screen
 from core.env import Environment
-from core.model.critic import Policy
+from core.model.modules import Actor
 from core.model.params import PPO, Paths
 
 DEVICE = torch.device(
@@ -21,7 +21,7 @@ paths.setTest(testID)
 
 params = PPO(paths)
 
-# Load the trained Policy
+# Load the trained Actor
 ckpt = torch.load(
     params.WEIGHTS,
     map_location='cpu',
@@ -29,7 +29,7 @@ ckpt = torch.load(
 )
 
 
-policy: Policy = Policy(
+policy: Actor = Actor(
     dimState=10,
     dimAction=2,
     # * Change according to the saved policy dimensions

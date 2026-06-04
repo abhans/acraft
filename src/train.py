@@ -6,10 +6,10 @@ import torch.optim as optim
 from tqdm import tqdm
 
 from core.env import Environment
-from core.model.critic import Critic, Policy
 
 # ---- User-defined Models ----
 from core.model.dataset import getExpertDataloader
+from core.model.modules import Actor, Critic
 from core.model.params import PPO, BClone, Paths
 from core.model.ppo import RolloutBuffer, updatePPO
 
@@ -23,6 +23,7 @@ def main():
     testID: str = paths.getCurrentTest()
     paths.setTest(testID)
     print(f"[SYSTEM::PPO] Training for Test {testID}")
+    
     params: dict[str, PPO | BClone] = {
         "ppo": PPO(paths),
         "bclone": BClone(paths)
@@ -45,7 +46,7 @@ def main():
 
     # -------------------- Initialize Networks --------------------
     # TODO: Experiment on different values for hidden dimensions
-    policy = Policy(dimState=10, dimAction=2, dimHidden=params["ppo"].HIDDEN_DIMS).to(DEVICE)
+    policy = Actor(dimState=10, dimAction=2, dimHidden=params["ppo"].HIDDEN_DIMS).to(DEVICE)
     critic = Critic(dimState=10, dimHidden=params["ppo"].HIDDEN_DIMS).to(DEVICE)
 
     # ----------- Load Pre-Trained Behavior Clone Weights -----------
@@ -213,7 +214,7 @@ def main():
         metrics.append({
             "Iter": iteration,
             "Average Reward": avgReward,
-            "Loss:Policy": ppoStats["policyLoss"],
+            "Loss:Actor": ppoStats["policyLoss"],
             "Loss:Value": ppoStats["valueLoss"],
             "Entropy": ppoStats["entropy"],
             "Explained Variance": varExplained.item(),
@@ -234,7 +235,7 @@ def main():
     dfMetrics = pd.DataFrame(metrics)
     dfMetrics.to_csv(params["ppo"].METRICS, index=False)
 
-    print(f"\n[SYSTEM:::PPO] Training complete. Policy saved to '{params["ppo"].WEIGHTS}'.")
+    print(f"\n[SYSTEM:::PPO] Training complete. Actor saved to '{params["ppo"].WEIGHTS}'.")
 
 
 if __name__ == "__main__":
