@@ -11,6 +11,8 @@ wheels/
 data/
 animations/*.mp4
 *.pdf
+*.png
+*.mp4
 
 # Tests
 tests/
