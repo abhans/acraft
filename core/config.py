@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
-_XGRID: list[int] = [400, 600, 1000, 1100]
-_YGRID: list[int] = [400, 600, 650, 700]
+_XGRID: list[int] = [800, 1100]
+_YGRID: list[int] = [300, 650, 700]
 
 WAYPOINTS: list[tuple[int, ...]] = [
     (X, Y) for X, Y in itertools.product(_XGRID, _YGRID)
