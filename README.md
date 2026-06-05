@@ -1,29 +1,43 @@
 # The Environment
 
-To run the application, use the command below:
+In order to run the simulation with "trained" policy, use the command below:
 
 ```bash
 python -W ignore -m src.main
 ```
 
-## Collecting Expert Data
+A window will appear that simulates episodes with random initial starting coordinates and active wind.
 
-For GAIL, expert data can be collected with running the `collector.py` as a standalone script:
+<!-- Add example screenshot -->
 
-```bash
-python -W ignore -m core.collector
-```
+## Training
 
-## Animating the Expert Data
-
-To validate the expert data, it can be animated using `animate.py` script:
+To system to function properly and for training to be reliable, expert data must be collected first. This can be done by the command below:
 
 ```bash
-python -W ignore -m data.animate
+python -W ignore -m core.env
 ```
 
-Both these scripts can be run in sequence to **first generate the new data** and then **animating it.**
+The data will be saved to `data/expert.npz` directory.
+
+After the collection of expert data, the `BehaviorClone` can be trained with the command below:
 
 ```bash
-python -W ignore -m core.collector; python -W ignore -m data.animate
+python -W ignore -m core.model.train
 ```
+
+Finally, PPO algorithm can be trained to achieve the trained policy which will be used in the real-time simulation. This can be done by the command below:
+
+``` bash
+python -W ignore -m src.train
+```
+
+### Chaining
+
+This entire process can be executed with the `main.sh` script:
+
+```bash
+./main.sh
+```
+
+This will automatically collect expert data, train Behavior Cloning and PPO, simulating the learned policy real-time at the end.
