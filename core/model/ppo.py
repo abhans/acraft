@@ -189,9 +189,6 @@ def updatePPO(
 
             expStates, expActions = next(dExpert)
         
-            iterExpert = iter(dExpert)
-            expStates, expActions = next(iterExpert)
-
             expStates = expStates.to(states.device)
             expActions = expActions.to(states.device)
 
