@@ -67,14 +67,6 @@ class Paths:
 
 
 @dataclass
-class Update:
-    """
-    Controls the ratio of network updates per training iteration.
-    For every 1 buffer rollout, we perform <GENERATOR> PPO updates.
-    """
-    GENERATOR: int = 3        # Number of PPO updates per buffer rollout
-
-@dataclass
 class Splits:
     """
     Hyperparameters for dataset splitting.
@@ -135,14 +127,14 @@ class PPO:
         # --- Environment & Buffer ---
         self.HIDDEN_DIMS: int = 128                 # Hidden dimensions for both Actor and Critic
         self.BUFFER_SIZE: int = 4096                # Steps collected per iteration
-        self.GAMMA: float = 0.99                    # Discount factor for future rewards
+        self.GAMMA: float = 0.995                   # Discount factor for future rewards
         self.LAMBDA_GAE: float = 0.95               # GAE smoothing parameter
         # --- PPO Specifics ---
         self.EPOCHS: int = 4                        # Times to loop over the buffer per update
         self.BATCH_SIZE: int = 512                  # Minibatch size for PPO
-        self.CLIP_EPSILON: float = 0.1              # PPO clipping parameter (epsilon)
+        self.CLIP_EPSILON: float = 0.2              # PPO clipping parameter (epsilon)
         self.COEFF_VALUE: float = 1.0               # Weight for the Critic's MSE loss
-        self.COEFF_ENTROPY: float = 0.001           # Weight for the Entropy bonus
+        self.COEFF_ENTROPY: float = 0.005           # Weight for the Entropy bonus
         self.COEFF_BCLONE: float = 0.1              # Weight for the Behavior Cloning loss
         # --- Training Loop ---
         self.ITERATIONS: int = 1000                 # Total number of times to collect a buffer and update
