@@ -1,6 +1,28 @@
 # The Environment
 
-In order to run the simulation with "trained" policy, use the command below:
+## Setup
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management. Install it with the command below if its' not installed:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Then create the virtual environment and install all dependencies:
+
+```bash
+uv sync
+```
+
+Activate the virtual environment:
+
+```bash
+source .venv/bin/activate
+```
+
+## Running the Program
+
+In order to run the simulation with the "trained" policy, use the command below:
 
 ```bash
 python -W ignore -m src.main
@@ -8,7 +30,17 @@ python -W ignore -m src.main
 
 A window will appear that simulates episodes with random initial starting coordinates and active wind.
 
-<!-- Add example screenshot -->
+![Environment Example](./docs/example.png)
+
+To record telemetry data over a number of episodes, pass the `-e` flag with the desired episode count:
+
+```bash
+python -W ignore -m src.main -e 20
+```
+
+The simulation will run for the specified number of episodes and save per-step telemetry data (position, velocity, heading, thrust, and reward) to `telemetry.csv` inside the current test directory. 
+
+The default number of episodes is `10`. Setting the flag to `0` disables data collection entirely.
 
 ## Training
 
@@ -19,6 +51,8 @@ python -W ignore -m core.env
 ```
 
 The data will be saved to `data/expert.npz` directory.
+
+![Example Training Results](./docs/results.png)
 
 After the collection of expert data, the `BehaviorClone` can be trained with the command below:
 
