@@ -95,8 +95,8 @@ class ExpertDataset(Dataset):
 
         return tState, tAction
 
-def getExpertDataloader(path: str, sBatch: int) -> torch.utils.data.DataLoader:
-    dataset = ExpertDataset(path)
+def getExpertDataloader(path: str, sBatch: int, targetIdx: int = 0) -> torch.utils.data.DataLoader:
+    dataset = ExpertDataset(path, targetIdx=targetIdx)
     return DataLoader(
         dataset,
         batch_size=sBatch,

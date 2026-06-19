@@ -22,7 +22,8 @@ class BehaviorClone:
         batchSize: int = 512,
         epochs: int = 50,
         lr: float = 3e-4,
-        
+        targetIdx: int = 0,
+        hiddenDims: int | None = None,
     ):
         self.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
@@ -40,7 +41,7 @@ class BehaviorClone:
         self.metrics: list[dict] = []
         # -------------------- Dataset Configuration & Loaders --------------------
         # Load the expert dataset
-        dataset = ExpertDataset(pathExpert)
+        dataset = ExpertDataset(pathExpert, targetIdx=targetIdx)
 
         sValidation = int(len(dataset) * splits.VALIDATION)
         sTrain = len(dataset) - sValidation
@@ -66,10 +67,11 @@ class BehaviorClone:
         )
 
         # --------------------------- Addition of Actor ---------------------------
+        _hiddenDims = hiddenDims if hiddenDims is not None else self.params["bclone"].HIDDEN_DIMS
         self.policy = Actor(
             dimState=10,
             dimAction=2,
-            dimHidden=self.params["bclone"].HIDDEN_DIMS
+            dimHidden=_hiddenDims
         ).to(self.device)
 
         self.optimizer = optim.Adam(

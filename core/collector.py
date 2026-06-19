@@ -20,11 +20,15 @@ class ExpertCollector:
             self,
             numTrajec,
             stepsPerTrajec: int = 500,
-            waypointIdx: int = 0
+            waypointIdx: int = 0,
+            saveDir: str = "data",
+            saveFilename: str = "expert.npz",
     ):
         self.numTrajec: int = numTrajec
         self.stepsPerTrajec: int = stepsPerTrajec
         self.targetWaypointIdx: int = waypointIdx
+        self.saveDir: str = saveDir
+        self.saveFilename: str = saveFilename
         self.allTrajec: list[np.ndarray] = []
         self.maxAttempts: int | None = None
 
@@ -232,7 +236,7 @@ class ExpertCollector:
             )
         
         # Save the collected expert data
-        self.save()
+        self.save(dir=self.saveDir, filename=self.saveFilename)
 
 
     def save(self, dir="data", filename="expert.npz"):
